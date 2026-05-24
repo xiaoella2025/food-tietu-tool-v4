@@ -1618,3 +1618,6 @@ function showToast(msg) {
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => t.remove(), 2200);
 }
+
+// 供「拼图导出」页复用艺术字预设（纯数据，无副作用）
+export { ART_PRESETS, ART_GROUP_A, ART_GROUP_B, ART_GROUP_C };

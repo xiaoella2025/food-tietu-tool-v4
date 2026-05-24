@@ -1,6 +1,7 @@
 import { renderImageEditPage, initImageEditPage, PRESETS } from './pages/ImageEdit.js';
 import { renderTextOverlayPage, initTextOverlayPage } from './pages/TextOverlay.js';
 import { renderEditWorkbench, initEditWorkbench, undoWorkbench, saveCurrentWorkbench } from './pages/EditWorkbench.js';
+import { renderCollageExport, initCollageExport } from './pages/CollageExport.js';
 
 // ===== GLOBAL STATE =====
 // 数据模型说明
@@ -33,6 +34,19 @@ const state = {
   workbenchFrameId: null,
   editProjects: {},   // frameId -> { baseDataUrl, layers, scripts, processed, saved, templateName }
   editResults: {},    // frameId -> { dataUrl, savedAt } 加字/处理后的成品图
+  // ===== 拼图导出 / 出成品图 =====
+  collage: {
+    items: [],
+    layers: [],
+    settings: {
+      ratio: '3:4', customW: 3, customH: 4,
+      layout: 'g4', cols: 2, gap: 12, outerPad: 24,
+      bg: { id: 'white', type: 'solid', color: '#ffffff' },
+      frame: '无边框',
+      small: { borderOn: false, borderColor: '#ffffff', borderWidth: 6, radius: 12, shadowOn: false },
+      exp: { format: 'png', quality: 92, hd: false, zipCollage: true, zipSingles: true, zipCopy: true },
+    },
+  },
   toast: '',
   toastTimeout: null,
   regionSelecting: false,
@@ -109,11 +123,12 @@ function render() {
   }
   app.innerHTML = `
     ${renderTopbar()}
-    <div class="page-content ${state.currentPage === 'workbench' ? 'page-content-full' : ''}">
+    <div class="page-content ${(state.currentPage === 'workbench' || state.currentPage === 'export') ? 'page-content-full' : ''}">
       ${state.currentPage === 'video' ? renderVideoPage() : ''}
       ${state.currentPage === 'edit' ? renderEditPage() : ''}
       ${state.currentPage === 'text' ? renderTextPage() : ''}
       ${state.currentPage === 'workbench' ? renderWorkbenchPage() : ''}
+      ${state.currentPage === 'export' ? renderExportPage() : ''}
     </div>
     ${state.toast ? `<div class="toast">${state.toast}</div>` : ''}
   `;
@@ -122,6 +137,7 @@ function render() {
   if (state.currentPage === 'edit') bindEditPageEvents();
   if (state.currentPage === 'text') bindTextPageEvents();
   if (state.currentPage === 'workbench') bindWorkbenchPage();
+  if (state.currentPage === 'export') bindExportPage();
 }
 
 function renderTopbar() {
@@ -392,6 +408,20 @@ function renderWorkbenchPage() {
       render();
     },
   });
+}
+
+// ===== 拼图导出页 =====
+function renderExportPage() {
+  return renderCollageExport({
+    frames: state.capturedFrames,
+    editResults: state.editResults,
+    editProjects: state.editProjects,
+    collage: state.collage,
+    onToast: (m) => { /* CollageExport 自行弹 toast */ },
+  });
+}
+function bindExportPage() {
+  initCollageExport();
 }
 
 function bindWorkbenchPage() {
