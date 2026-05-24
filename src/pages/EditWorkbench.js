@@ -27,12 +27,26 @@ const ART_PRESETS = {
 };
 
 const COLOR_FX = {
-  '原图':   { brightness: 100, contrast: 100, saturate: 100, temp: 0 },
-  '提亮':   { brightness: 115, contrast: 102, saturate: 105, temp: 5 },
-  '暖色':   { brightness: 104, contrast: 102, saturate: 110, temp: 28 },
-  '高对比': { brightness: 100, contrast: 130, saturate: 110, temp: 0 },
-  '柔和':   { brightness: 106, contrast: 92,  saturate: 95,  temp: 6 },
-  '冷白':   { brightness: 110, contrast: 104, saturate: 96,  temp: -22 },
+  '原图':     { brightness: 100, contrast: 100, saturate: 100, temp: 0 },
+  '提亮':     { brightness: 115, contrast: 102, saturate: 105, temp: 5 },
+  '暖色':     { brightness: 104, contrast: 102, saturate: 110, temp: 28 },
+  '高对比':   { brightness: 100, contrast: 130, saturate: 110, temp: 0 },
+  '柔和':     { brightness: 106, contrast: 92,  saturate: 95,  temp: 6 },
+  '冷白':     { brightness: 110, contrast: 104, saturate: 96,  temp: -22 },
+  '食欲增强': { brightness: 106, contrast: 112, saturate: 128, temp: 18 },
+  '红润肉色': { brightness: 103, contrast: 110, saturate: 122, temp: 24 },
+  '清爽蔬菜': { brightness: 108, contrast: 106, saturate: 118, temp: -6 },
+  '汤品通透': { brightness: 112, contrast: 104, saturate: 108, temp: 10 },
+  '油亮红烧': { brightness: 100, contrast: 120, saturate: 130, temp: 22 },
+  '家常自然': { brightness: 104, contrast: 103, saturate: 106, temp: 6 },
+  '封面鲜亮': { brightness: 110, contrast: 118, saturate: 124, temp: 8 },
+  '暗部提亮': { brightness: 120, contrast: 96,  saturate: 104, temp: 4 },
+  '轻微去雾': { brightness: 104, contrast: 122, saturate: 112, temp: 0 },
+  '米面白净': { brightness: 114, contrast: 102, saturate: 96,  temp: -10 },
+  '夜市烟火': { brightness: 98,  contrast: 124, saturate: 126, temp: 20 },
+  '暖锅热气': { brightness: 105, contrast: 114, saturate: 120, temp: 26 },
+  '柔焦质感': { brightness: 107, contrast: 94,  saturate: 102, temp: 8 },
+  '干净冷光': { brightness: 109, contrast: 108, saturate: 98,  temp: -18 },
 };
 
 // ===== 模块状态（每次 render 重置引用）=====
@@ -53,7 +67,8 @@ let canvas = null, ctx = null;
 let viewW = 0, viewH = 0, viewScale = 1;
 
 let drag = { active: false, layerId: null, ox: 0, oy: 0 };
-let resize = { active: false, layerId: null, handle: null, sx: 0, startFont: 0, startWidth: 0, startBoxW: 0 };
+let resize = { active: false, layerId: null, handle: null, sx: 0, sy: 0, startFont: 0, startWidth: 0, startBoxW: 0, startBoxH: 0 };
+let inlineEdit = { active: false, layerId: null, el: null };
 
 let cropRect = null;          // 图片像素坐标 {x,y,w,h}
 let cropRatio = '原图';
@@ -147,8 +162,11 @@ function renderDock() {
     <div class="wb-dock ${activeTool ? 'open' : ''}" id="wb-dock">
       <div class="wb-dock-bar">
         ${tools.map(t => `<button class="wb-tool ${activeTool === t.id ? 'active' : ''}" data-tool="${t.id}">${t.label}</button>`).join('')}
-        <button class="wb-tool wb-tool-apply" data-tool="apply-selected" title="把当前处理参数应用到队列里勾选的图（第2步补齐）">应用到选中</button>
-        ${activeTool ? `<button class="wb-dock-collapse" id="wb-dock-collapse" title="收起">⌄ 收起</button>` : ''}
+        <span class="wb-dock-right">
+          <button class="wb-tool" data-tool="apply-selected" title="把当前处理参数应用到队列里勾选的图（第2步补齐）">应用到选中</button>
+          <button class="wb-tool primary" id="wb-dock-save" title="保存当前成图（与右上角相同）">💾 保存当前</button>
+          ${activeTool ? `<button class="wb-dock-collapse" id="wb-dock-collapse" title="收起">⌄ 收起</button>` : ''}
+        </span>
       </div>
       ${activeTool ? `<div class="wb-dock-params" id="wb-dock-params">${renderDockParams()}</div>` : ''}
     </div>
@@ -255,18 +273,27 @@ function renderSubtitleParams() {
   `;
 }
 
-// ===== 右侧：文字生成与样式（手风琴）=====
+// ===== 右侧：双工作区（文字内容 + 文字格式）=====
 function renderRight() {
   return `
     <div class="wb-right" id="wb-right">
-      <div class="wb-right-title">文字生成与样式设置</div>
-      <div class="wb-right-scroll">
-        ${section('template', '成图模板', renderTemplateBlock())}
-        ${section('title', '① 标题生成', renderTitleBlock())}
-        ${section('steps', '② 步骤图文字', renderStepsBlock())}
-        ${section('body', '③ 正文编辑', renderBodyBlock())}
-        ${section('style', '④ 字体与样式', renderStyleBlock())}
-        ${section('art', '⑤ 艺术字模板', renderArtBlock())}
+      <div class="wb-right-tabs" id="wb-right-tabs">
+        <button data-rtab="content" class="active">文字内容</button>
+        <button data-rtab="format">文字格式</button>
+      </div>
+      <div class="wb-right-dual" data-rtab="content" id="wb-right-dual">
+        <div class="wb-ws wb-ws-content">
+          <div class="wb-ws-title">文字内容</div>
+          ${section('template', '成图模板', renderTemplateBlock())}
+          ${section('title', '① 标题生成', renderTitleBlock())}
+          ${section('steps', '② 步骤图文字', renderStepsBlock())}
+          ${section('body', '③ 正文编辑', renderBodyBlock())}
+        </div>
+        <div class="wb-ws wb-ws-format">
+          <div class="wb-ws-title">文字格式</div>
+          <div id="wb-format">${renderStyleBlock()}</div>
+          ${section('art', '艺术字模板', renderArtBlock())}
+        </div>
       </div>
     </div>
   `;
@@ -306,9 +333,12 @@ function renderTemplateBlock() {
 function renderTitleBlock() {
   const p = project();
   return `
-    <div class="wb-field"><input type="text" id="wb-title-kw" placeholder="输入关键词（如：红烧排骨）" value="${escapeAttr(p.scripts.keyword || '')}"></div>
+    <label class="wb-flabel">关键词 / 菜名</label>
+    <div class="wb-field"><input type="text" id="wb-title-kw" placeholder="例如：饺子皮" value="${escapeAttr(p.scripts.keyword || '')}"></div>
+    <label class="wb-flabel">候选标题（点一下填入下方）</label>
     <div class="wb-cands" id="wb-title-cands">${buildTitleCandidates(p.scripts.keyword).map(c => `<button class="wb-cand" data-title-cand="${escapeAttr(c)}">${escapeHTML(c)}</button>`).join('')}</div>
-    <div class="wb-field"><textarea id="wb-title-text" rows="2" placeholder="标题文字">${escapeHTML(p.scripts.title || '')}</textarea></div>
+    <label class="wb-flabel">准备加入画布的标题</label>
+    <div class="wb-field"><textarea id="wb-title-text" rows="2" placeholder="在此确认最终标题文字">${escapeHTML(p.scripts.title || '')}</textarea></div>
     <button class="primary wb-add" data-add="title">加入画布（标题）</button>
   `;
 }
@@ -617,7 +647,9 @@ function renderHandles() {
   box.style.cssText = `left:${ox + b.x}px;top:${oy + b.y}px;width:${b.w}px;height:${b.h}px;`;
   wrap.appendChild(box);
   const hs = 8;
-  [['nw', -hs, -hs, 'nwse-resize'], ['ne', b.w - hs, -hs, 'nesw-resize'], ['sw', -hs, b.h - hs, 'nesw-resize'], ['se', b.w - hs, b.h - hs, 'nwse-resize'], ['w', -hs, b.h / 2 - hs, 'ew-resize'], ['e', b.w - hs, b.h / 2 - hs, 'ew-resize']].forEach(([h, x, y, cur]) => {
+  [['nw', -hs, -hs, 'nwse-resize'], ['ne', b.w - hs, -hs, 'nesw-resize'], ['sw', -hs, b.h - hs, 'nesw-resize'], ['se', b.w - hs, b.h - hs, 'nwse-resize'],
+   ['w', -hs, b.h / 2 - hs, 'ew-resize'], ['e', b.w - hs, b.h / 2 - hs, 'ew-resize'],
+   ['n', b.w / 2 - hs, -hs, 'ns-resize'], ['s', b.w / 2 - hs, b.h - hs, 'ns-resize']].forEach(([h, x, y, cur]) => {
     const hd = document.createElement('div');
     hd.className = 'wb-rh'; hd.dataset.rh = h; hd.dataset.layerId = layer.id;
     hd.style.cssText = `left:${ox + b.x + x}px;top:${oy + b.y + y}px;cursor:${cur};`;
@@ -641,8 +673,10 @@ function onResize() { sizeCanvas(); drawAll(); renderHandles(); }
 function setTool(tool) {
   activeTool = (activeTool === tool) ? null : tool;
   canvasMode = activeTool === 'crop' ? 'crop' : activeTool === 'watermark' ? 'watermark' : 'text';
-  if (canvasMode === 'crop' && !cropRect) initCropRect();
-  if (canvasMode !== 'crop') {}
+  // 模式与裁剪/水印框严格同步：离开对应模式即清掉框，杜绝残留
+  if (canvasMode === 'crop') { if (!cropRect) initCropRect(); } else { cropRect = null; }
+  if (canvasMode !== 'watermark') { wmRect = null; }
+  commitInlineEdit();
   refreshDock();
   refreshModeBadge();
   drawAll();
@@ -653,9 +687,10 @@ function bindDock() {
   const dock = document.getElementById('wb-dock');
   if (!dock) return;
   dock.addEventListener('click', e => {
+    if (e.target.id === 'wb-dock-save') { saveCurrentWorkbench(); return; }
     const toolBtn = e.target.closest('[data-tool]');
     if (toolBtn) { setTool(toolBtn.dataset.tool); return; }
-    if (e.target.id === 'wb-dock-collapse') { activeTool = null; canvasMode = 'text'; refreshDock(); refreshModeBadge(); drawAll(); renderHandles(); return; }
+    if (e.target.id === 'wb-dock-collapse') { activeTool = null; canvasMode = 'text'; cropRect = null; wmRect = null; refreshDock(); refreshModeBadge(); drawAll(); renderHandles(); return; }
     handleDockParamClick(e);
   });
   dock.addEventListener('input', handleDockParamInput);
@@ -853,6 +888,7 @@ function bindCanvas() {
     const rect = canvas.getBoundingClientRect();
     const px = e.clientX - rect.left, py = e.clientY - rect.top;
     if (px < 0 || py < 0 || px > rect.width || py > rect.height) return;
+    if (inlineEdit.active) commitInlineEdit();
 
     if (canvasMode === 'crop') {
       const ip = viewToImg(px, py);
@@ -877,7 +913,7 @@ function bindCanvas() {
       selectedLayerId = hit.id;
       pushUndo();
       drag = { active: true, layerId: hit.id, ox: px - hit.xPct * viewW, oy: py - hit.yPct * viewH };
-      if (changed) { refreshStyle(); refreshQueueStatus(); }
+      if (changed) { refreshStyle(); focusFormatTab(); refreshQueueStatus(); }
       drawAll(); renderHandles(); e.preventDefault();
     } else if (selectedLayerId) {
       selectedLayerId = null; refreshStyle(); drawAll(); renderHandles();
@@ -900,13 +936,68 @@ function bindCanvas() {
     if (!layer || !layer._box) return;
     selectedLayerId = layer.id;
     pushUndo();
-    resize = { active: true, layerId: layer.id, handle: hd.dataset.rh, sx: e.clientX, startFont: layer.fontSize, startWidth: layer.textWidth || Math.round((baseW || 800) * 0.8), startBoxW: layer._box.w };
+    resize = { active: true, layerId: layer.id, handle: hd.dataset.rh, sx: e.clientX, sy: e.clientY, startFont: layer.fontSize, startWidth: layer.textWidth || Math.round((baseW || 800) * 0.8), startBoxW: layer._box.w, startBoxH: layer._box.h };
   });
 
-  canvas.addEventListener('dblclick', () => {
-    const ta = document.getElementById('wb-sel-text');
-    if (ta) { ta.focus(); ta.selectionStart = ta.selectionEnd = ta.value.length; }
+  canvas.addEventListener('dblclick', e => {
+    if (canvasMode !== 'text') return;
+    const rect = canvas.getBoundingClientRect();
+    const px = e.clientX - rect.left, py = e.clientY - rect.top;
+    const layers = project().layers;
+    let hit = null;
+    for (let i = layers.length - 1; i >= 0; i--) {
+      const b = layers[i]._box; if (!b) continue;
+      if (px >= b.x - 4 && px <= b.x + b.w + 4 && py >= b.y - 4 && py <= b.y + b.h + 4) { hit = layers[i]; break; }
+    }
+    if (hit) { selectedLayerId = hit.id; refreshStyle(); editLayerInline(hit); }
   });
+}
+
+// 画布上直接编辑：在文字层位置叠一个 textarea
+function editLayerInline(layer) {
+  commitInlineEdit();
+  const wrap = document.getElementById('wb-canvas-wrap');
+  if (!wrap || !layer._box) return;
+  pushUndo();
+  const b = layer._box;
+  const ta = document.createElement('textarea');
+  ta.className = 'wb-inline-edit';
+  ta.value = layer.text || '';
+  const fontPx = Math.max(12, layer.fontSize * viewScale);
+  ta.style.cssText = `left:${b.x}px;top:${b.y}px;width:${Math.max(80, b.w)}px;height:${Math.max(36, b.h)}px;`
+    + `font-size:${fontPx}px;line-height:${(layer.lineHeight || 1.32)};text-align:${layer.align || 'center'};`
+    + `color:${layer.color};font-weight:${layer.bold ? '700' : '400'};`;
+  wrap.appendChild(ta);
+  inlineEdit = { active: true, layerId: layer.id, el: ta };
+  ta.focus();
+  ta.selectionStart = ta.selectionEnd = ta.value.length;
+  ta.addEventListener('input', () => {
+    const l = project().layers.find(x => x.id === inlineEdit.layerId);
+    if (!l) return;
+    l.text = ta.value;
+    drawAll();
+    // 同步右侧"当前选中文字"文本框（不重渲染，保持画布编辑焦点）
+    const sel = document.getElementById('wb-sel-text');
+    if (sel) sel.value = ta.value;
+  });
+  ta.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); commitInlineEdit(); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); commitInlineEdit(); }
+  });
+  ta.addEventListener('blur', () => commitInlineEdit());
+}
+function commitInlineEdit() {
+  if (!inlineEdit.active) return;
+  const el = inlineEdit.el;
+  const lid = inlineEdit.layerId;
+  inlineEdit = { active: false, layerId: null, el: null };
+  if (el && el.parentNode) el.parentNode.removeChild(el);
+  const l = project().layers.find(x => x.id === lid);
+  if (l) l.text = el ? el.value : l.text;
+  markDirty();
+  refreshStyle();
+  drawAll();
+  renderHandles();
 }
 
 let cropHandleDrag = { active: false, handle: null, start: null };
@@ -928,15 +1019,27 @@ function onCanvasMove(e) {
   if (resize.active) {
     const layer = project().layers.find(l => l.id === resize.layerId); if (!layer) return;
     const dx = e.clientX - resize.sx;
-    if (['nw', 'ne', 'sw', 'se'].includes(resize.handle)) {
-      const dir = (resize.handle === 'se' || resize.handle === 'ne') ? 1 : -1;
+    const dy = e.clientY - resize.sy;
+    const h = resize.handle;
+    if (['nw', 'ne', 'sw', 'se'].includes(h)) {
+      // 四角：等比改字号（宽度同步），用对角位移取较大者，手感更稳
+      const dirX = (h === 'se' || h === 'ne') ? 1 : -1;
+      const dirY = (h === 'se' || h === 'sw') ? 1 : -1;
+      const eff = Math.abs(dx * dirX) >= Math.abs(dy * dirY) ? dx * dirX : dy * dirY;
       const base = Math.max(20, resize.startBoxW);
-      const factor = Math.max(0.2, (base + dx * dir) / base);
+      const factor = Math.max(0.2, (base + eff) / base);
       layer.fontSize = Math.max(12, Math.round(resize.startFont * factor));
       layer.textWidth = Math.max(40, Math.round(resize.startWidth * factor));
-    } else {
-      const dir = resize.handle === 'w' ? -1 : 1;
+    } else if (h === 'e' || h === 'w') {
+      // 左右：改文字框宽度（自动换行）
+      const dir = h === 'w' ? -1 : 1;
       layer.textWidth = Math.max(40, Math.round(resize.startWidth + (dx * dir) / viewScale));
+    } else {
+      // 上下：改字号（高度跟随，多行区域随之变化）
+      const dir = h === 's' ? 1 : -1;
+      const base = Math.max(20, resize.startBoxH);
+      const factor = Math.max(0.2, (base + dy * dir) / base);
+      layer.fontSize = Math.max(12, Math.round(resize.startFont * factor));
     }
     drawAll(); renderHandles(); syncFontSlider(layer); return;
   }
@@ -981,6 +1084,13 @@ function bindRight() {
   if (!right) return;
 
   right.addEventListener('click', e => {
+    const rt = e.target.closest('[data-rtab]');
+    if (rt && rt.parentElement && rt.parentElement.id === 'wb-right-tabs') {
+      const dual = document.getElementById('wb-right-dual');
+      if (dual) dual.dataset.rtab = rt.dataset.rtab;
+      document.querySelectorAll('#wb-right-tabs [data-rtab]').forEach(b => b.classList.toggle('active', b === rt));
+      return;
+    }
     const acc = e.target.closest('[data-acc-toggle]');
     if (acc) { const k = acc.dataset.accToggle; accordion[k] = !accordion[k]; refreshRight(); return; }
     handleRightClick(e);
@@ -1085,7 +1195,7 @@ function addLayer(kind, name, text) {
   p.layers.push(layer);
   selectedLayerId = layer.id;
   markDirty();
-  refreshStyle(); refreshRightAccordionOpen('style'); drawAll(); renderHandles(); refreshQueueStatus();
+  refreshStyle(); focusFormatTab(); drawAll(); renderHandles(); refreshQueueStatus();
 }
 function deleteSelectedLayer() {
   const p = project(); const idx = p.layers.findIndex(l => l.id === selectedLayerId);
@@ -1167,6 +1277,7 @@ function bindQueue() {
   });
 }
 function switchFrame(id) {
+  commitInlineEdit();
   const p = project();
   if (p && !p.saved && (p.layers.length > 0 || p.processed)) {
     if (!window.confirm('当前图还未保存，切换将保留草稿但不生成成品。确定切换？')) return;
@@ -1251,11 +1362,17 @@ function refreshRight() {
   old.outerHTML = renderRight();
   bindRight();
 }
-function refreshRightAccordionOpen(key) { if (!accordion[key]) { accordion[key] = true; refreshRight(); } }
+// 窄屏 Tab 模式下，加入文字/选中后切到「文字格式」工作区（宽屏两栏并排，无副作用）
+function focusFormatTab() {
+  const dual = document.getElementById('wb-right-dual');
+  if (dual) dual.dataset.rtab = 'format';
+  document.querySelectorAll('#wb-right-tabs [data-rtab]').forEach(b => b.classList.toggle('active', b.dataset.rtab === 'format'));
+}
+// 文字格式工作区（含当前选中文字 + 样式）局部刷新
 function refreshStyle() {
-  const acc = document.querySelector('.wb-acc[data-acc="style"] .wb-acc-body');
-  if (!acc) { refreshRight(); return; }
-  acc.innerHTML = renderStyleBlock();
+  const box = document.getElementById('wb-format');
+  if (!box) { refreshRight(); return; }
+  box.innerHTML = renderStyleBlock();
 }
 function refreshStepsBlock() {
   const acc = document.querySelector('.wb-acc[data-acc="steps"] .wb-acc-body');

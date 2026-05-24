@@ -1734,7 +1734,7 @@ textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(
 
 .wb {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(0, 1fr) 520px;
   grid-template-rows: minmax(0, 1fr) auto;
   gap: 10px;
   height: calc(100vh - 58px - 24px);
@@ -1784,8 +1784,13 @@ textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(
 .wb-sval { text-align: right; font-weight: 800; color: var(--color-primary); }
 
 /* 右侧手风琴 */
-.wb-right-title { padding: 11px 14px; font-size: 14px; font-weight: 800; border-bottom: 1px solid var(--color-border); }
-.wb-right-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; }
+.wb-right-tabs { display: none; gap: 6px; padding: 8px 8px 0; }
+.wb-right-tabs button { flex: 1; height: 32px; font-size: 13px; font-weight: 800; }
+.wb-right-tabs button.active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+.wb-right-dual { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; }
+.wb-ws { min-height: 0; overflow-y: auto; border: 1px solid rgba(200,216,248,0.6); border-radius: var(--radius-md); padding: 8px; }
+.wb-ws-title { font-size: 13px; font-weight: 800; color: var(--color-text); padding: 2px 2px 8px; border-bottom: 1px solid rgba(200,216,248,0.6); margin-bottom: 8px; }
+#wb-format { display: block; }
 .wb-acc { border: 1px solid var(--color-border); border-radius: var(--radius-sm); margin-bottom: 8px; overflow: hidden; }
 .wb-acc-head { display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; font-size: 13px; font-weight: 800; cursor: pointer; background: #f5f8ff; }
 .wb-acc-arrow { color: var(--color-text-muted); }
@@ -1836,10 +1841,28 @@ textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(
 .b-saved { background: #e7f8ee; color: #1a9a5a; }
 .b-unsaved { background: #fdecec; color: #d42a2a; }
 
-@media (max-width: 1280px) {
-  .wb { grid-template-columns: minmax(0, 1fr) 300px; }
+/* 工具坞右侧按钮组（应用到选中 / 保存当前 / 收起）靠右 */
+.wb-dock-right { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+
+/* 画布上文字直接编辑的叠层 textarea */
+.wb-inline-edit {
+  position: absolute; z-index: 20; margin: 0; padding: 2px 4px;
+  border: 2px solid var(--color-primary); border-radius: 4px;
+  background: rgba(255,255,255,0.92); resize: none; overflow: hidden;
+  font-family: "Microsoft YaHei","PingFang SC",Arial,sans-serif;
+  box-shadow: 0 2px 10px rgba(20,50,140,0.25);
 }
-@media (max-width: 1024px) {
+
+/* 窄屏：右侧双工作区退化为 Tab 切换 */
+@media (max-width: 1180px) {
+  .wb { grid-template-columns: minmax(0, 1fr) 340px; }
+  .wb-right-tabs { display: flex; }
+  .wb-right-dual { display: block; }
+  .wb-ws { display: none; margin-bottom: 8px; max-height: none; }
+  .wb-right-dual[data-rtab="content"] .wb-ws-content { display: block; }
+  .wb-right-dual[data-rtab="format"] .wb-ws-format { display: block; }
+}
+@media (max-width: 900px) {
   .wb { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto auto; }
-  .wb-right { grid-column: 1; grid-row: auto; max-height: 320px; }
+  .wb-right { grid-column: 1; grid-row: auto; max-height: 340px; }
 }
