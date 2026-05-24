@@ -2003,3 +2003,9 @@ textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(
   .cx-right-dual[data-rtab="text"] .cx-ws-text { display: block; }
 }
 @media (max-width: 860px) { .cx { grid-template-columns: minmax(0,1fr); grid-template-rows: minmax(0,1fr) auto; } .cx-right { grid-column: 1; max-height: 340px; } }
+
+/* 拼图导出返工3：方案说明/问号提示 */
+.cx-block-desc { font-size: 11px; line-height: 1.6; color: var(--color-text-secondary); background: #f5f8ff; border: 1px solid #e0e8f8; border-radius: 8px; padding: 7px 9px; margin-bottom: 8px; }
+.cx-block-desc b { color: var(--color-primary); }
+.cx-q { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; background: var(--color-primary); color: #fff; font-size: 10px; font-weight: 800; cursor: help; }
+.cx-delbtn { z-index: 60; }

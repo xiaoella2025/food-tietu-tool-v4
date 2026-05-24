@@ -149,6 +149,7 @@ let cellSel = null;      // 选中的格子 itemId（规则/不规则模式内�
 let cellDrag = { active: false, sx: 0, sy: 0, ox0: 0, oy0: 0, maxX: 0, maxY: 0 };
 let lastCells = [];      // 最近一次绘制的格子 [{itemId,x,y,w,h,rot}]（design 坐标）
 let rightTab = 'set';    // set | text（窄屏 tab）
+let awaitingReplace = false;  // 自由图片"替换图片"待选状态
 let accordion = { pub: true, layout: true, pin: true, canvas: false, small: false, sticker: false, scheme: false, export: false };
 
 let drag = { active: false, id: null, ox: 0, oy: 0 };
@@ -348,39 +349,45 @@ function itemById(id) { return C.items.find(it => it.frameId === id); }
 function renderSchemeBlock() {
   const schemes = getSchemes(), presets = getPresets();
   return `
-    <div class="cx-flabel">当前拼图方案（含图片，可继续编辑）</div>
-    <div class="cx-row"><select id="cx-scheme-sel" style="flex:1"><option value="">— 选择方案 —</option>${schemes.map((s, i) => `<option value="${i}">${escapeHTML(s.name)}</option>`).join('')}</select></div>
+    <div class="cx-block-desc"><b>当前拼图工程</b>：保存这张拼图的完整工程（图片、文字、贴图、所有设置），可继续编辑。<br><b>版式模板</b>：只保存布局和样式，不保存具体图片，适合以后换一组图片复用。</div>
+    <div class="cx-flabel">当前拼图工程 <span class="cx-q" title="保存当前这张拼图的完整工程，包含图片、文字、贴图和所有设置，可继续编辑。">?</span></div>
+    <div class="cx-row"><select id="cx-scheme-sel" style="flex:1"><option value="">— 选择拼图工程 —</option>${schemes.map((s, i) => `<option value="${i}">${escapeHTML(s.name)}</option>`).join('')}</select></div>
     <div class="cx-addrow">
-      <button class="cx-add" id="cx-scheme-new">新建</button>
-      <button class="cx-add" id="cx-scheme-save">保存</button>
-      <button class="cx-add" id="cx-scheme-copy">复制</button>
-      <button class="cx-add" id="cx-scheme-del">删除</button>
+      <button class="cx-add" id="cx-new-blank" title="清空当前画布的文字/贴图/自由图层，开始一张新拼图，不删除底部素材。">新建空白拼图</button>
+      <button class="cx-add primary" id="cx-scheme-save" title="保存当前这张拼图，之后可以继续编辑。">保存当前拼图</button>
+      <button class="cx-add" id="cx-scheme-copy" title="复制一份当前拼图，方便做第二张相似成品。">复制当前拼图</button>
+      <button class="cx-add" id="cx-scheme-del" title="删除选中的拼图工程（不影响底部素材）。">删除当前拼图</button>
     </div>
-    <div class="cx-flabel">预设方案（只存版式样式，不绑图片）</div>
-    <div class="cx-row"><select id="cx-preset-sel" style="flex:1"><option value="">— 选择预设 —</option>${presets.map((p, i) => `<option value="${i}">${escapeHTML(p.name)}</option>`).join('')}</select></div>
+    <button class="cx-add" id="cx-clear-canvas" style="width:100%;margin-top:4px" title="清掉当前画布上的文字/贴图/自由图层，保留底部素材与设置。">清空当前画布</button>
+    <div class="cx-flabel" style="margin-top:12px">版式模板 <span class="cx-q" title="只保存版式与样式，不保存具体图片，适合以后换图复用。">?</span></div>
+    <div class="cx-row"><select id="cx-preset-sel" style="flex:1"><option value="">— 选择版式模板 —</option>${presets.map((p, i) => `<option value="${i}">${escapeHTML(p.name)}</option>`).join('')}</select></div>
     <div class="cx-addrow">
-      <button class="cx-add" id="cx-preset-apply">套用</button>
-      <button class="cx-add" id="cx-preset-save">存为预设</button>
-      <button class="cx-add" id="cx-preset-update">更新预设</button>
+      <button class="cx-add primary" id="cx-preset-apply" title="把模板版式套到当前已选图片上，不带模板原图片。">套用到当前图片</button>
+      <button class="cx-add" id="cx-preset-save" title="保存当前布局、边框、文字和贴图样式，方便以后复用。">保存当前版式为模板</button>
+      <button class="cx-add" id="cx-preset-update" title="用当前版式覆盖选中的模板。">更新当前模板</button>
     </div>
-    <div class="cx-note">「保存方案」=可回来继续编辑的项目；「导出」=生成最终文件，两者不同。</div>
+    <div class="cx-note">「保存当前拼图」=可回来继续编辑；「导出」=生成最终文件，两者不同。</div>
   `;
 }
 function renderTextStyle() {
   const l = curLayer();
-  if (!l || l.kind === 'sticker') return `<div class="cx-empty">点画布上的文字选中，或先用上方按钮加一段文字</div>`;
+  if (!l) return `<div class="cx-empty">点画布上的文字/贴图/图片选中，或用上方按钮加一段文字</div>`;
+  if (l.kind === 'image') return renderImageLayerPanel(l);
+  if (l.kind === 'sticker') return `${layerOrderBar()}<div class="cx-empty" style="padding:8px">贴图：画布拖动移动、拖角缩放、顶部圆点旋转、右上角×或Delete删除。</div>`;
+  const col = (v, d) => (typeof v === 'string' && /^#/.test(v)) ? v : d;
   return `
-    <div class="cx-field"><label class="cx-flabel">当前文字内容</label><textarea id="cx-seltext" rows="2">${escapeHTML(l.text || '')}</textarea></div>
-    <div class="cx-slider2" data-ls="fontSize"><label>字号</label><input type="range" min="16" max="200" step="2" value="${l.fontSize}"><span class="cx-val">${l.fontSize}</span></div>
-    <div class="cx-row"><label>颜色</label><input type="color" data-lp="color" value="${l.color}">
+    ${layerOrderBar()}
+    <div class="cx-field"><label class="cx-flabel">当前文字内容（右侧改字一定生效）</label><textarea id="cx-seltext" rows="2">${escapeHTML(l.text || '')}</textarea></div>
+    <div class="cx-slider2" data-ls="fontSize"><label>字号</label><input type="range" min="16" max="200" step="2" value="${l.fontSize || 48}"><span class="cx-val">${l.fontSize || 48}</span></div>
+    <div class="cx-row"><label>颜色</label><input type="color" data-lp="color" value="${col(l.color, '#ffffff')}">
       <div class="cx-sw">${COLOR_PRESETS.map(c => `<button class="cx-swatch" data-colorfor="color" data-color="${c}" style="background:${c}"></button>`).join('')}</div></div>
     <div class="cx-row cx-check"><label><input type="checkbox" data-lp="bold" ${l.bold ? 'checked' : ''}> 加粗</label>
-      <label><input type="checkbox" data-lp="strokeOn" ${l.strokeOn ? 'checked' : ''}> 描边</label><input type="color" data-lp="strokeColor" value="${l.strokeColor}"></div>
-    <div class="cx-slider2" data-ls="strokeWidth"><label>描边粗细</label><input type="range" min="0" max="24" step="1" value="${l.strokeWidth}"><span class="cx-val">${l.strokeWidth}</span></div>
-    <div class="cx-row cx-check"><label><input type="checkbox" data-lp="bgOn" ${l.bgOn ? 'checked' : ''}> 背景板</label><input type="color" data-lp="bgColor" value="${l.bgColor}"></div>
-    <div class="cx-slider2" data-ls="bgRadius"><label>圆角</label><input type="range" min="0" max="40" step="1" value="${l.bgRadius}"><span class="cx-val">${l.bgRadius}</span></div>
+      <label><input type="checkbox" data-lp="strokeOn" ${l.strokeOn ? 'checked' : ''}> 描边</label><input type="color" data-lp="strokeColor" value="${col(l.strokeColor, '#000000')}"></div>
+    <div class="cx-slider2" data-ls="strokeWidth"><label>描边粗细</label><input type="range" min="0" max="24" step="1" value="${l.strokeWidth || 0}"><span class="cx-val">${l.strokeWidth || 0}</span></div>
+    <div class="cx-row cx-check"><label><input type="checkbox" data-lp="bgOn" ${l.bgOn ? 'checked' : ''}> 背景板</label><input type="color" data-lp="bgColor" value="${col(l.bgColor, '#000000')}"></div>
+    <div class="cx-slider2" data-ls="bgRadius"><label>圆角</label><input type="range" min="0" max="40" step="1" value="${l.bgRadius || 0}"><span class="cx-val">${l.bgRadius || 0}</span></div>
     <div class="cx-row cx-check"><label><input type="checkbox" data-lp="shadowOn" ${l.shadowOn ? 'checked' : ''}> 阴影</label>
-      <label><input type="checkbox" data-lp="borderOn" ${l.borderOn ? 'checked' : ''}> 边框</label><input type="color" data-lp="borderColor" value="${l.borderColor}"></div>
+      <label><input type="checkbox" data-lp="borderOn" ${l.borderOn ? 'checked' : ''}> 边框</label><input type="color" data-lp="borderColor" value="${col(l.borderColor, '#000000')}"></div>
     <div class="cx-slider2" data-ls="lineHeightX10"><label>行距</label><input type="range" min="8" max="26" step="1" value="${Math.round((l.lineHeight || LH) * 10)}"><span class="cx-val">${Math.round((l.lineHeight || LH) * 10)}</span></div>
     <div class="cx-row"><label>对齐</label><div class="cx-btng">${['left', 'center', 'right'].map(a => `<button data-align="${a}" class="${l.align === a ? 'active' : ''}">${a === 'left' ? '左' : a === 'center' ? '中' : '右'}</button>`).join('')}</div></div>
     <div class="cx-row"><label>旋转</label><input type="number" data-lpn="rotate" value="${Math.round(l.rotate || 0)}" min="-180" max="180" style="width:58px"> °
@@ -390,6 +397,28 @@ function renderTextStyle() {
       ${[...ART_GROUP_A.slice(0, 6), ...ART_GROUP_B.slice(0, 5), ...ART_GROUP_C].map(id => `<button class="cx-artbtn" data-art="${id}">${ART_PRESETS[id].label}</button>`).join('')}
     </div>
     <button class="cx-del" data-dellayer="1">删除此文字</button>
+  `;
+}
+function layerOrderBar() {
+  return `<div class="cx-row"><label>图层</label><div class="cx-btng">
+    <button data-order="up" title="上移一层">上移</button>
+    <button data-order="down" title="下移一层">下移</button>
+    <button data-order="top" title="置顶">置顶</button>
+    <button data-order="bottom" title="置底">置底</button>
+  </div></div>`;
+}
+function renderImageLayerPanel(l) {
+  return `
+    ${layerOrderBar()}
+    <div class="cx-slider2" data-img="innerScale"><label>取景缩放</label><input type="range" min="100" max="280" step="5" value="${Math.round((l.innerScale || 1) * 100)}"><span class="cx-val">${Math.round((l.innerScale || 1) * 100)}</span></div>
+    <div class="cx-slider2" data-img="innerOffX"><label>取景左右</label><input type="range" min="-100" max="100" step="5" value="${Math.round((l.innerOffX || 0) * 100)}"><span class="cx-val">${Math.round((l.innerOffX || 0) * 100)}</span></div>
+    <div class="cx-slider2" data-img="innerOffY"><label>取景上下</label><input type="range" min="-100" max="100" step="5" value="${Math.round((l.innerOffY || 0) * 100)}"><span class="cx-val">${Math.round((l.innerOffY || 0) * 100)}</span></div>
+    <div class="cx-addrow">
+      <button class="cx-add" id="cx-img-resetview">重置取景</button>
+      <button class="cx-add ${awaitingReplace ? 'primary' : ''}" id="cx-img-replace">${awaitingReplace ? '点底部图替换…' : '替换图片'}</button>
+    </div>
+    <button class="cx-del" data-dellayer="1">删除此图片</button>
+    <div class="cx-note">自由图片：拖动移动、拖角缩放整体、顶部圆点旋转；用滑杆在框内取景；「替换图片」后点底部素材换图。</div>
   `;
 }
 function renderStickerBlock() {
@@ -506,10 +535,9 @@ function drawCells(c, x0, y0, w, h) {
   const slots = slotsFor(C.settings.pinstyle, n);
   let rects = [];
   if (slots) {
-    const k = Math.min(slots.length, n);
-    for (let i = 0; i < k; i++) {
+    for (let i = 0; i < slots.length; i++) {
       const s = slots[i];
-      rects.push({ item: ps[i], x: x0 + s.x * w + gap / 2, y: y0 + s.y * h + gap / 2, w: s.w * w - gap, h: s.h * h - gap, rot: s.rot || 0 });
+      rects.push({ item: ps[i] || null, x: x0 + s.x * w + gap / 2, y: y0 + s.y * h + gap / 2, w: s.w * w - gap, h: s.h * h - gap, rot: s.rot || 0 });
     }
   } else {
     const cols = Math.max(1, Math.min(4, C.settings.cols));
@@ -518,6 +546,14 @@ function drawCells(c, x0, y0, w, h) {
     ps.forEach((s, i) => { const r = Math.floor(i / cols), col = i % cols; rects.push({ item: s, x: x0 + col * (cellW + gap), y: y0 + r * (cellH + gap), w: cellW, h: cellH, rot: 0 }); });
   }
   rects.forEach(rc => {
+    if (!rc.item) { // 空位提示
+      c.save(); if (rc.rot) { const ccx = rc.x + rc.w / 2, ccy = rc.y + rc.h / 2; c.translate(ccx, ccy); c.rotate(rc.rot * Math.PI / 180); c.translate(-ccx, -ccy); }
+      c.fillStyle = 'rgba(29,95,231,0.06)'; roundRect(c, rc.x, rc.y, rc.w, rc.h, C.settings.small.radius); c.fill();
+      c.strokeStyle = '#9aa7c0'; c.setLineDash([8, 6]); c.lineWidth = 2; c.stroke(); c.setLineDash([]);
+      c.fillStyle = '#8096b8'; c.font = `${Math.round(Math.min(rc.w, rc.h) * 0.12)}px ${FONT_STACK}`; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText('请添加图片', rc.x + rc.w / 2, rc.y + rc.h / 2); c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+      c.restore(); return;
+    }
     drawCell(c, rc.item, rc.x, rc.y, rc.w, rc.h, rc.rot);
     lastCells.push({ itemId: rc.item.id, x: rc.x, y: rc.y, w: rc.w, h: rc.h, rot: rc.rot });
   });
@@ -559,7 +595,11 @@ function drawImageLayer(c, l) {
   const rot = (l.rotate || 0) * Math.PI / 180;
   c.save(); c.translate(cx0, cy0); if (rot) c.rotate(rot);
   c.shadowColor = 'rgba(0,0,0,0.25)'; c.shadowBlur = 12; c.shadowOffsetY = 4;
-  c.drawImage(img, -w / 2, -h / 2, w, h);
+  c.save();
+  roundRect(c, -w / 2, -h / 2, w, h, 4); c.clip();
+  // 框内取景：innerScale 放大、innerOff 平移
+  drawCover(c, img, -w / 2, -h / 2, w, h, l.innerScale || 1, l.innerOffX || 0, l.innerOffY || 0);
+  c.restore();
   c.restore();
   l._box = { x: cx0 - w / 2, y: cy0 - h / 2, w, h };
 }
@@ -784,7 +824,7 @@ function bindCanvas() {
     const r = canvas.getBoundingClientRect();
     const px = (e.clientX - r.left) / sPrev, py = (e.clientY - r.top) / sPrev;
     const layers = C.layers || [];
-    for (let i = layers.length - 1; i >= 0; i--) { const b = layers[i]._box; if (b && layers[i].kind !== 'sticker' && px >= b.x - 6 && px <= b.x + b.w + 6 && py >= b.y - 6 && py <= b.y + b.h + 6) { selectedLayerId = layers[i].id; refreshTextStyle(); editInline(layers[i]); break; } }
+    for (let i = layers.length - 1; i >= 0; i--) { const b = layers[i]._box; if (b && layers[i].kind === 'text' && px >= b.x - 6 && px <= b.x + b.w + 6 && py >= b.y - 6 && py <= b.y + b.h + 6) { selectedLayerId = layers[i].id; refreshTextStyle(); editInline(layers[i]); break; } }
   });
 }
 function onMove(e) {
@@ -812,11 +852,15 @@ function editInline(l) {
   const wrapEl = document.getElementById('cx-canvas-wrap'); if (!wrapEl || !l._box) return;
   const b = l._box;
   const ta = document.createElement('textarea'); ta.className = 'cx-inline'; ta.value = l.text || '';
-  const fpx = Math.min(46, Math.max(15, l.fontSize * sPrev));
-  ta.style.cssText = `left:${b.x * sPrev}px;top:${b.y * sPrev}px;width:${Math.max(120, b.w * sPrev)}px;min-height:${Math.max(40, Math.min(b.h * sPrev, 160))}px;font-size:${fpx}px;text-align:${l.align || 'center'};`;
+  const fpx = Math.min(40, Math.max(15, (l.fontSize || 48) * sPrev));
+  const w = Math.min(previewW - 8, Math.max(140, b.w * sPrev));
+  let left = Math.max(2, Math.min(b.x * sPrev, previewW - w - 2));
+  let top = Math.max(2, Math.min(b.y * sPrev, previewH - 50));
+  ta.style.cssText = `left:${left}px;top:${top}px;width:${w}px;font-size:${fpx}px;text-align:${l.align || 'center'};max-height:${Math.max(120, previewH - top - 6)}px;`;
   wrapEl.appendChild(ta); inlineEdit = { active: true, id: l.id, el: ta };
-  ta.focus(); ta.setSelectionRange(0, ta.value.length);
-  ta.addEventListener('input', () => { const x = layerById(inlineEdit.id); if (!x) return; x.text = ta.value; redraw(); const s = document.getElementById('cx-seltext'); if (s) s.value = ta.value; });
+  const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, previewH - top - 6) + 'px'; };
+  ta.focus(); ta.setSelectionRange(0, ta.value.length); grow();
+  ta.addEventListener('input', () => { const x = layerById(inlineEdit.id); if (!x) return; x.text = ta.value; grow(); redraw(); const s = document.getElementById('cx-seltext'); if (s) s.value = ta.value; });
   ta.addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); commitInline(); } else if (ev.key === 'Escape') { ev.preventDefault(); commitInline(); } });
   ta.addEventListener('blur', () => commitInline());
 }
@@ -849,19 +893,25 @@ function handleRightClick(e) {
   const fr = t.closest('[data-frame]'); if (fr) { C.settings.frame = fr.dataset.frame; refreshRight(); redraw(); return; }
   // 上传贴图
   if (t.id === 'cx-upload-btn') { document.getElementById('cx-upload')?.click(); return; }
-  // 方案
-  if (t.id === 'cx-scheme-new') { schemeNew(); return; }
+  // 拼图工程
+  if (t.id === 'cx-new-blank') { newBlank(); return; }
+  if (t.id === 'cx-clear-canvas') { clearCanvas(); return; }
   if (t.id === 'cx-scheme-save') { schemeSave(); return; }
-  if (t.id === 'cx-scheme-copy') { schemeCopy(); return; }
+  if (t.id === 'cx-scheme-copy') { schemeCopyCurrent(); return; }
   if (t.id === 'cx-scheme-del') { schemeDel(); return; }
   if (t.id === 'cx-preset-apply') { presetApply(); return; }
   if (t.id === 'cx-preset-save') { presetSave(); return; }
   if (t.id === 'cx-preset-update') { presetUpdate(); return; }
+  // 图层顺序
+  const ord = t.closest('[data-order]'); if (ord) { reorderLayer(ord.dataset.order); return; }
+  // 自由图片取景/替换
+  if (t.id === 'cx-img-resetview') { const l = curLayer(); if (l) { l.innerScale = 1; l.innerOffX = 0; l.innerOffY = 0; redraw(); refreshTextStyle(); } return; }
+  if (t.id === 'cx-img-replace') { awaitingReplace = !awaitingReplace; refreshTextStyle(); if (awaitingReplace) toast('请点击底部素材，替换当前选中图片'); return; }
   const at = t.closest('[data-addtext]'); if (at) { addText(at.dataset.addtext); return; }
   const al = t.closest('[data-align]'); if (al) { const l = curLayer(); if (l) { l.align = al.dataset.align; redraw(); refreshTextStyle(); } return; }
   const sw = t.closest('[data-colorfor]'); if (sw) { const l = curLayer(); if (l) { l[sw.dataset.colorfor] = sw.dataset.color; redraw(); refreshTextStyle(); } return; }
   const rb = t.closest('[data-rot]'); if (rb) { const l = curLayer(); if (!l) return; const d = +rb.dataset.rot; let nr = d === 0 ? 0 : (l.rotate || 0) + d; nr = ((nr + 180) % 360 + 360) % 360 - 180; l.rotate = nr; redraw(); refreshTextStyle(); return; }
-  const art = t.closest('[data-art]'); if (art) { const l = curLayer(); if (!l || l.kind === 'sticker') { toast('请先选中一段文字'); return; } Object.assign(l, ART_PRESETS[art.dataset.art].style); redraw(); refreshTextStyle(); return; }
+  const art = t.closest('[data-art]'); if (art) { const l = curLayer(); if (!l || l.kind !== 'text') { toast('请先选中一段文字'); return; } Object.assign(l, ART_PRESETS[art.dataset.art].style); redraw(); refreshTextStyle(); return; }
   const stk = t.closest('[data-stk]'); if (stk) { addSticker(+stk.dataset.stk); return; }
   if (t.closest('[data-dellayer]')) { delLayer(); return; }
   const fmt = t.closest('[data-fmt]'); if (fmt) { C.settings.exp.format = fmt.dataset.fmt; refreshRight(); return; }
@@ -873,6 +923,7 @@ function handleRightInput(e) {
   const t = e.target;
   if (t.id === 'cx-scheme-sel') { if (t.value !== '') schemeLoad(+t.value); return; }
   const cz = t.closest('[data-cellzoom]'); if (cz) { const it = itemById(cellSel); if (it) { it.scale = parseFloat(t.value) / 100; const sp = cz.querySelector('.cx-val'); if (sp) sp.textContent = Math.round(parseFloat(t.value)); redraw(); } return; }
+  const im = t.closest('[data-img]'); if (im) { const l = curLayer(); if (l) { const k = im.dataset.img; const v = parseFloat(t.value); if (k === 'innerScale') l.innerScale = v / 100; else l[k] = v / 100; const sp = im.querySelector('.cx-val'); if (sp) sp.textContent = Math.round(v); redraw(); } return; }
   const set = t.closest('[data-set]'); if (set) { const k = set.dataset.set; const v = parseFloat(t.value); setNum(k, v); const sp = set.querySelector('.cx-val'); if (sp) sp.textContent = Math.round(v); redraw(); return; }
   if (t.dataset.setColor) { C.settings.bg = { id: 'custom', type: 'solid', color: t.value }; redraw(); return; }
   if (t.dataset.small) { const k = t.dataset.small; C.settings.small[k] = t.type === 'checkbox' ? t.checked : t.value; redraw(); return; }
@@ -900,6 +951,12 @@ function bindQueue() {
   q.addEventListener('click', e => {
     const tg = e.target.closest('[data-toggle]'); if (tg) { const it = C.items.find(x => x.frameId === tg.dataset.toggle); if (it) it.on = !it.on; loadImages(() => { refreshQueue(); redraw(); }); return; }
     const mv = e.target.closest('[data-mv]'); if (mv) { moveItem(mv.dataset.id, mv.dataset.mv === 'up' ? -1 : 1); return; }
+    // 替换自由图片：等待替换状态下点素材卡 → 替换当前选中图片层的 frameId
+    if (awaitingReplace) {
+      const card = e.target.closest('.cx-qcard');
+      const l = curLayer();
+      if (card && l && l.kind === 'image') { l.frameId = card.dataset.it; awaitingReplace = false; loadImages(() => { redraw(); refreshTextStyle(); }); toast('已替换图片'); return; }
+    }
   });
   // 拖拽排序
   let dragId = null;
@@ -917,6 +974,25 @@ function defaultText() {
   return { fontSize: 64, color: '#ffffff', bold: true, align: 'center', lineHeight: LH, textWidth: Math.round(designW * 0.9),
     strokeOn: true, strokeColor: '#000000', strokeWidth: 6, bgOn: false, bgColor: '#000000', bgAlpha: 0.55, bgRadius: 12,
     borderOn: false, borderColor: '#000000', borderWidth: 2, shadowOn: false, shadowColor: '#000000', rotate: 0, vertical: false, glow: false, glowColor: '#00e5ff' };
+}
+function defaultSettings() {
+  return { ratio: '3:4', customW: 3, customH: 4, layout: 'g4', cols: 2, pinstyle: 'grid', gap: 12, outerPad: 24,
+    bg: { id: 'white', type: 'solid', color: '#ffffff' }, frame: '无边框',
+    small: { borderOn: false, borderColor: '#ffffff', borderWidth: 6, radius: 12, shadowOn: false },
+    exp: { format: 'png', quality: 92, hd: false, zipCollage: true, zipSingles: true, zipCopy: true } };
+}
+// 兜底补齐颜色等字段，避免 input[type=color] 收到 undefined
+function normalizeLayer(l) {
+  if (!l) return l;
+  if (l.kind === 'text') {
+    const d = defaultText();
+    ['color', 'strokeColor', 'bgColor', 'borderColor', 'shadowColor', 'glowColor'].forEach(k => { if (typeof l[k] !== 'string' || !/^#/.test(l[k])) l[k] = d[k]; });
+    ['fontSize', 'strokeWidth', 'bgRadius', 'borderWidth', 'lineHeight', 'bgAlpha'].forEach(k => { if (l[k] == null) l[k] = d[k]; });
+    if (l.align == null) l.align = 'center';
+  } else if (l.kind === 'sticker') {
+    if (l.stype !== 'img') { if (typeof l.bg !== 'string') l.bg = '#ff2d55'; if (typeof l.color !== 'string') l.color = '#ffffff'; }
+  }
+  return l;
 }
 function addText(kind) {
   C.layers = C.layers || [];
@@ -955,22 +1031,47 @@ function ensureFreeImages() {
 function resetFreeImages() { C.layers = (C.layers || []).filter(l => l.kind !== 'image'); ensureFreeImages(); selectedLayerId = null; }
 function refreshPinZoom() { const acc = document.querySelector('.cx-acc[data-acc="pin"] .cx-acc-body'); if (acc) acc.innerHTML = renderPinStyle(); }
 
-// ===== 方案 / 预设（localStorage）=====
+// ===== 方案 / 模板（localStorage，带容量保护）=====
+function safeSet(key, arr) {
+  try { localStorage.setItem(key, JSON.stringify(arr)); return true; }
+  catch (e) {
+    if (e && (e.name === 'QuotaExceededError' || /quota/i.test(e.message || ''))) toast('浏览器本地存储不足：请减少方案数量、删除旧方案，或导出后清理。本次未保存。');
+    else toast('保存失败：' + (e.message || '未知错误'));
+    return false;
+  }
+}
 function getSchemes() { try { return JSON.parse(localStorage.getItem('cxSchemes') || '[]'); } catch { return []; } }
-function setSchemes(a) { localStorage.setItem('cxSchemes', JSON.stringify(a)); }
+function setSchemes(a) { return safeSet('cxSchemes', a); }
 function getPresets() { try { return JSON.parse(localStorage.getItem('cxPresets') || '[]'); } catch { return []; } }
-function setPresets(a) { localStorage.setItem('cxPresets', JSON.stringify(a)); }
+function setPresets(a) { return safeSet('cxPresets', a); }
+// 工程快照：只存结构 + frameId（不重复存参与图片 dataUrl）；贴图上传图保留 dataUrl
 function snapshot() { return JSON.parse(JSON.stringify({ items: C.items, layers: (C.layers || []).map(l => { const { _box, ...r } = l; return r; }), settings: C.settings })); }
-function loadSnapshot(s) { C.items = JSON.parse(JSON.stringify(s.items || [])); C.layers = JSON.parse(JSON.stringify(s.layers || [])); C.settings = JSON.parse(JSON.stringify(s.settings || C.settings)); }
-function schemeNew() { const name = prompt('新方案名称：', '方案' + (getSchemes().length + 1)); if (!name) return; const a = getSchemes(); a.push({ name: name.trim(), snap: snapshot() }); setSchemes(a); toast('已新建方案'); refreshRight(); }
-function schemeSave() { const sel = document.getElementById('cx-scheme-sel'); const a = getSchemes(); if (sel && sel.value !== '') { a[+sel.value].snap = snapshot(); setSchemes(a); toast('已保存到当前方案'); } else { schemeNew(); } }
-function schemeCopy() { const sel = document.getElementById('cx-scheme-sel'); const a = getSchemes(); if (!sel || sel.value === '') { toast('请先选择要复制的方案'); return; } const src = a[+sel.value]; a.push({ name: src.name + ' 副本', snap: JSON.parse(JSON.stringify(src.snap)) }); setSchemes(a); toast('已复制方案'); refreshRight(); }
-function schemeDel() { const sel = document.getElementById('cx-scheme-sel'); const a = getSchemes(); if (!sel || sel.value === '') { toast('请先选择要删除的方案'); return; } if (!window.confirm('删除该方案？')) return; a.splice(+sel.value, 1); setSchemes(a); toast('已删除方案'); refreshRight(); }
-function schemeLoad(i) { const a = getSchemes(); if (!a[i]) return; loadSnapshot(a[i].snap); selectedLayerId = null; cellSel = null; applyRatio(C.settings.ratio); imgCache = {}; refreshRight(); refreshQueue(); loadImages(() => { sizeCanvas(); redraw(); }); toast(`已载入方案：${a[i].name}`); }
+function loadSnapshot(s) { C.items = JSON.parse(JSON.stringify(s.items || [])); C.layers = (JSON.parse(JSON.stringify(s.layers || []))).map(normalizeLayer); C.settings = Object.assign(defaultSettings(), JSON.parse(JSON.stringify(s.settings || {}))); if (!C.settings.small) C.settings.small = defaultSettings().small; }
+function schemeSave() { const sel = document.getElementById('cx-scheme-sel'); const a = getSchemes(); if (sel && sel.value !== '') { a[+sel.value].snap = snapshot(); if (setSchemes(a)) toast('已保存当前拼图'); } else { const name = prompt('拼图工程名称：', '拼图' + (a.length + 1)); if (!name) return; a.push({ name: name.trim(), snap: snapshot() }); if (setSchemes(a)) { toast('已保存当前拼图'); refreshRight(); } } }
+function schemeCopyCurrent() { const a = getSchemes(); const name = prompt('复制为新拼图，名称：', '拼图副本'); if (!name) return; a.push({ name: name.trim(), snap: snapshot() }); if (setSchemes(a)) { toast('已复制为新拼图工程'); refreshRight(); } }
+function schemeDel() { const sel = document.getElementById('cx-scheme-sel'); const a = getSchemes(); if (!sel || sel.value === '') { toast('请先在下拉里选择要删除的拼图工程'); return; } if (!window.confirm('删除该拼图工程？（不影响底部素材）')) return; a.splice(+sel.value, 1); setSchemes(a); toast('已删除'); refreshRight(); }
+function schemeLoad(i) { const a = getSchemes(); if (!a[i]) return; loadSnapshot(a[i].snap); selectedLayerId = null; cellSel = null; awaitingReplace = false; applyRatio(C.settings.ratio); imgCache = {}; if (C.settings.pinstyle === 'free') ensureFreeImages(); refreshRight(); refreshQueue(); loadImages(() => { sizeCanvas(); redraw(); }); toast(`已载入：${a[i].name}`); }
+function newBlank() { if (!window.confirm('新建空白拼图？将清空当前画布的文字/贴图/自由图层（不删除底部素材）。')) return; C.layers = []; C.items.forEach(it => { delete it.offX; delete it.offY; delete it.scale; }); selectedLayerId = null; cellSel = null; awaitingReplace = false; refreshRight(); refreshQueue(); loadImages(() => redraw()); toast('已新建空白拼图'); }
+function clearCanvas() { if (!window.confirm('清空当前画布上的文字/贴图/自由图层？（保留底部素材与设置）')) return; C.layers = []; selectedLayerId = null; cellSel = null; awaitingReplace = false; if (C.settings.pinstyle === 'free') ensureFreeImages(); refreshRight(); loadImages(() => redraw()); toast('已清空画布'); }
+function reorderLayer(dir) { const i = (C.layers || []).findIndex(l => l.id === selectedLayerId); if (i < 0) return; const a = C.layers; if (dir === 'up' && i < a.length - 1) { [a[i], a[i + 1]] = [a[i + 1], a[i]]; } else if (dir === 'down' && i > 0) { [a[i], a[i - 1]] = [a[i - 1], a[i]]; } else if (dir === 'top') { a.push(a.splice(i, 1)[0]); } else if (dir === 'bottom') { a.unshift(a.splice(i, 1)[0]); } redraw(); }
 function presetSnapshot() { const s = JSON.parse(JSON.stringify(C.settings)); const layers = (C.layers || []).filter(l => l.kind !== 'image').map(l => { const { _box, dataUrl, ...r } = l; return r; }); return { settings: s, layers }; }
-function presetSave() { const name = prompt('预设方案名称：'); if (!name) return; const a = getPresets(); a.push({ name: name.trim(), ...presetSnapshot() }); setPresets(a); toast('已保存为预设'); refreshRight(); }
-function presetUpdate() { const sel = document.getElementById('cx-preset-sel'); const a = getPresets(); if (!sel || sel.value === '') { toast('请先选择要更新的预设'); return; } const ps = presetSnapshot(); a[+sel.value].settings = ps.settings; a[+sel.value].layers = ps.layers; setPresets(a); toast('已更新预设'); }
-function presetApply() { const sel = document.getElementById('cx-preset-sel'); const a = getPresets(); if (!sel || sel.value === '') { toast('请先选择一个预设'); return; } const p = a[+sel.value]; C.settings = JSON.parse(JSON.stringify(p.settings)); C.layers = (C.layers || []).filter(l => l.kind === 'image').concat(JSON.parse(JSON.stringify(p.layers || []))); applyRatio(C.settings.ratio); selectedLayerId = null; cellSel = null; refreshRight(); refreshQueue(); loadImages(() => { sizeCanvas(); redraw(); }); toast(`已套用预设：${p.name}（不含图片）`); }
+function presetSave() { const name = prompt('版式模板名称：'); if (!name) return; const a = getPresets(); a.push({ name: name.trim(), ...presetSnapshot() }); if (setPresets(a)) { toast('已保存版式模板（不含图片）'); refreshRight(); } }
+function presetUpdate() { const sel = document.getElementById('cx-preset-sel'); const a = getPresets(); if (!sel || sel.value === '') { toast('请先选择要更新的版式模板'); return; } const ps = presetSnapshot(); a[+sel.value].settings = ps.settings; a[+sel.value].layers = ps.layers; if (setPresets(a)) toast('已更新模板'); }
+function presetApply() {
+  const sel = document.getElementById('cx-preset-sel'); const a = getPresets();
+  if (!sel || sel.value === '') { toast('请先选择一个版式模板'); return; }
+  const p = a[+sel.value];
+  C.settings = Object.assign(defaultSettings(), JSON.parse(JSON.stringify(p.settings || {})));
+  // 套用版式：保留当前已选图片（grid/不规则自动进入图片位；free 用 ensureFreeImages 把当前图铺入）
+  C.layers = JSON.parse(JSON.stringify(p.layers || [])).map(normalizeLayer);
+  applyRatio(C.settings.ratio);
+  if (C.settings.pinstyle === 'free') ensureFreeImages();
+  selectedLayerId = null; cellSel = null; awaitingReplace = false;
+  refreshRight(); refreshQueue(); loadImages(() => { sizeCanvas(); redraw(); });
+  const n = participants().length, slots = slotsFor(C.settings.pinstyle, n);
+  if (slots && n < slots.length) toast(`已套用模板：${p.name}。该版式需 ${slots.length} 张，当前 ${n} 张，空位显示"请添加图片"`);
+  else toast(`已套用模板：${p.name}（已用当前已选图片）`);
+}
 
 // ===== 上传 / 粘贴贴图 =====
 function handleUpload(e) {
