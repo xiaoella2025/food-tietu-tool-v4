@@ -40,6 +40,37 @@ const LAYOUTS = [
 // 外框模板
 const FRAMES = ['无边框', '细白边', '细黑边', '奶油边框', '圆角卡片', '小红书白卡', '国风宣纸', '木纹菜单', '黑金高级', '虚线手账', '拍立得', '胶片'];
 
+// 拼图样式（规则宫格 + 不规则版式 + 自由摆放）
+const PIN_STYLES = [
+  { id: 'grid', label: '规则宫格' },
+  { id: 'left-big-2', label: '左大右二' },
+  { id: 'right-big-2', label: '右大左二' },
+  { id: 'top-big-2', label: '上大下二' },
+  { id: 'bottom-big-2', label: '下大上二' },
+  { id: 'one-big-3', label: '一大三小' },
+  { id: 'one-big-4', label: '一大四小' },
+  { id: 'magazine', label: '杂志风' },
+  { id: 'scattered', label: '错落卡片' },
+  { id: 'polaroid-stack', label: '拍立得叠放' },
+  { id: 'free', label: '自由摆放' },
+];
+// 不规则版式槽位（content 区内的分数坐标 {x,y,w,h,rot?}），按参与图前 N 张填充
+function slotsFor(style, n) {
+  const g = 0; // 间距由 gap 在外部统一处理（这里返回基础分数，绘制时收缩）
+  switch (style) {
+    case 'left-big-2': return [{ x: 0, y: 0, w: 0.62, h: 1 }, { x: 0.64, y: 0, w: 0.36, h: 0.49 }, { x: 0.64, y: 0.51, w: 0.36, h: 0.49 }];
+    case 'right-big-2': return [{ x: 0.38, y: 0, w: 0.62, h: 1 }, { x: 0, y: 0, w: 0.36, h: 0.49 }, { x: 0, y: 0.51, w: 0.36, h: 0.49 }];
+    case 'top-big-2': return [{ x: 0, y: 0, w: 1, h: 0.62 }, { x: 0, y: 0.64, w: 0.49, h: 0.36 }, { x: 0.51, y: 0.64, w: 0.49, h: 0.36 }];
+    case 'bottom-big-2': return [{ x: 0, y: 0.38, w: 1, h: 0.62 }, { x: 0, y: 0, w: 0.49, h: 0.36 }, { x: 0.51, y: 0, w: 0.49, h: 0.36 }];
+    case 'one-big-3': return [{ x: 0, y: 0, w: 0.6, h: 1 }, { x: 0.62, y: 0, w: 0.38, h: 0.32 }, { x: 0.62, y: 0.34, w: 0.38, h: 0.32 }, { x: 0.62, y: 0.68, w: 0.38, h: 0.32 }];
+    case 'one-big-4': return [{ x: 0, y: 0, w: 1, h: 0.58 }, { x: 0, y: 0.6, w: 0.235, h: 0.4 }, { x: 0.255, y: 0.6, w: 0.235, h: 0.4 }, { x: 0.51, y: 0.6, w: 0.235, h: 0.4 }, { x: 0.765, y: 0.6, w: 0.235, h: 0.4 }];
+    case 'magazine': return [{ x: 0, y: 0, w: 0.64, h: 0.64 }, { x: 0.66, y: 0, w: 0.34, h: 0.64 }, { x: 0, y: 0.66, w: 0.32, h: 0.34 }, { x: 0.34, y: 0.66, w: 0.32, h: 0.34 }, { x: 0.68, y: 0.66, w: 0.32, h: 0.34 }];
+    case 'scattered': return [{ x: 0.02, y: 0.04, w: 0.5, h: 0.46, rot: -4 }, { x: 0.48, y: 0.02, w: 0.5, h: 0.46, rot: 5 }, { x: 0.04, y: 0.52, w: 0.5, h: 0.46, rot: 3 }, { x: 0.46, y: 0.52, w: 0.52, h: 0.46, rot: -5 }];
+    case 'polaroid-stack': return [{ x: 0.06, y: 0.1, w: 0.52, h: 0.62, rot: -7 }, { x: 0.4, y: 0.16, w: 0.52, h: 0.62, rot: 6 }, { x: 0.24, y: 0.3, w: 0.52, h: 0.62, rot: -2 }];
+    default: return null;
+  }
+}
+
 // 背景预设
 const BG_PRESETS = [
   { id: 'white', label: '纯白', type: 'solid', color: '#ffffff' },
@@ -82,6 +113,22 @@ const STICKERS = [
   { stype: 'pill', text: '0失败', bg: '#7b1fa2', color: '#ffffff' },
   { stype: 'pill', text: '好吃', bg: '#e91e63', color: '#ffffff' },
   { stype: 'pill', text: '今日菜', bg: '#3949ab', color: '#ffffff' },
+  // 补齐成套
+  { stype: 'emoji', glyph: '❌', name: '打叉' },
+  { stype: 'emoji', glyph: '⬆️', name: '上箭头' },
+  { stype: 'emoji', glyph: '⬅️', name: '左箭头' },
+  { stype: 'emoji', glyph: '👎', name: '点踩' },
+  { stype: 'emoji', glyph: '🤍', name: '空心心' },
+  { stype: 'emoji', glyph: '✨', name: '闪光' },
+  { stype: 'emoji', glyph: '♨️', name: '热气' },
+  { stype: 'emoji', glyph: '❗', name: '重点' },
+  { stype: 'emoji', glyph: '💬', name: '评论' },
+  { stype: 'emoji', glyph: '🔁', name: '转发' },
+  { stype: 'pill', text: '重点', bg: '#ff9800', color: '#ffffff' },
+  { stype: 'pill', text: '避坑', bg: '#455a64', color: '#ffeb3b' },
+  { stype: 'pill', text: '营养', bg: '#00897b', color: '#ffffff' },
+  { stype: 'pill', text: '评论', bg: '#3949ab', color: '#ffffff' },
+  { stype: 'pill', text: '转发', bg: '#0277bd', color: '#ffffff' },
 ];
 
 const COLOR_PRESETS = ['#ffffff', '#000000', '#ffd24d', '#ff5252', '#3aa0ff', '#1aa760'];
@@ -96,9 +143,13 @@ let onToastCb = null;
 let canvas = null, ctx = null;
 let designW = 1080, designH = 1080;
 let sPrev = 1, previewW = 0, previewH = 0;
-let imgCache = {};       // frameId -> HTMLImageElement
+let imgCache = {};       // frameId / 贴图layerId -> HTMLImageElement
 let selectedLayerId = null;
-let accordion = { pub: true, layout: true, canvas: false, small: false, text: true, sticker: false, export: false };
+let cellSel = null;      // 选中的格子 itemId（规则/不规则模式内拖动缩放小图）
+let cellDrag = { active: false, sx: 0, sy: 0, ox0: 0, oy0: 0, maxX: 0, maxY: 0 };
+let lastCells = [];      // 最近一次绘制的格子 [{itemId,x,y,w,h,rot}]（design 坐标）
+let rightTab = 'set';    // set | text（窄屏 tab）
+let accordion = { pub: true, layout: true, pin: true, canvas: false, small: false, sticker: false, scheme: false, export: false };
 
 let drag = { active: false, id: null, ox: 0, oy: 0 };
 let resize = { active: false, id: null, handle: null, sx: 0, sy: 0, startFont: 0, startW: 0, startBoxW: 0, startBoxH: 0, startSize: 0 };
@@ -117,6 +168,7 @@ export function renderCollageExport({ frames, editResults, editProjects, collage
 
   syncItems();
   applyRatio(C.settings.ratio);
+  if (C.settings.pinstyle === 'free') ensureFreeImages();
 
   const sources = sourceList();
   if (sources.length === 0) {
@@ -205,18 +257,36 @@ function renderQueue() {
   `;
 }
 
-// ===== 右侧控制 =====
+// ===== 右侧控制（双工作区：拼图设置 / 成品文字）=====
 function renderRight() {
   return `
     <div class="cx-right" id="cx-right">
-      <div class="cx-right-scroll">
-        ${sec('pub', '① 发布与比例', renderPub())}
-        ${sec('layout', '② 拼图布局', renderLayout())}
-        ${sec('canvas', '③ 画布与大图边框', renderCanvasBlock())}
-        ${sec('small', '④ 小图样式', renderSmall())}
-        ${sec('text', '⑤ 成品文字', renderTextBlock())}
-        ${sec('sticker', '⑥ 贴图素材', renderStickerBlock())}
-        ${sec('export', '⑦ 导出设置', renderExportBlock())}
+      <div class="cx-right-tabs" id="cx-right-tabs">
+        <button data-rtab="set" class="${rightTab === 'set' ? 'active' : ''}">拼图设置</button>
+        <button data-rtab="text" class="${rightTab === 'text' ? 'active' : ''}">成品文字</button>
+      </div>
+      <div class="cx-right-dual" data-rtab="${rightTab}" id="cx-right-dual">
+        <div class="cx-ws cx-ws-set">
+          <div class="cx-ws-title">拼图设置</div>
+          ${sec('pub', '① 发布与比例', renderPub())}
+          ${sec('layout', '② 拼图布局', renderLayout())}
+          ${sec('pin', '③ 拼图样式', renderPinStyle())}
+          ${sec('canvas', '④ 画布与边框', renderCanvasBlock())}
+          ${sec('small', '⑤ 小图样式', renderSmall())}
+          ${sec('sticker', '⑥ 贴图素材', renderStickerBlock())}
+          ${sec('scheme', '⑦ 拼图方案', renderSchemeBlock())}
+          ${sec('export', '⑧ 导出设置', renderExportBlock())}
+        </div>
+        <div class="cx-ws cx-ws-text">
+          <div class="cx-ws-title">成品文字</div>
+          <div class="cx-addrow">
+            <button class="cx-add" data-addtext="title">+ 总标题</button>
+            <button class="cx-add" data-addtext="subtitle">+ 副标题</button>
+            <button class="cx-add" data-addtext="body">+ 说明</button>
+            <button class="cx-add" data-addtext="tag">+ 标签</button>
+          </div>
+          <div id="cx-textstyle">${renderTextStyle()}</div>
+        </div>
       </div>
     </div>
   `;
@@ -226,6 +296,14 @@ function sec(key, title, body) {
   return `<div class="cx-acc ${open ? 'open' : ''}" data-acc="${key}">
     <div class="cx-acc-head" data-acc-toggle="${key}"><span>${title}</span><span>${open ? '▾' : '▸'}</span></div>
     <div class="cx-acc-body">${body}</div></div>`;
+}
+function renderPinStyle() {
+  return `
+    <div class="cx-chips">${PIN_STYLES.map(p => `<button class="cx-chip ${C.settings.pinstyle === p.id ? 'active' : ''}" data-pin="${p.id}">${p.label}</button>`).join('')}</div>
+    <div class="cx-note">规则宫格用上方「列数」；不规则样式按参与图前几张填充大小格；自由摆放可任意拖动/缩放/旋转每张图。</div>
+    ${C.settings.pinstyle !== 'free' && cellSel ? `<div class="cx-slider" data-cellzoom="1"><label>选中格缩放</label><input type="range" min="100" max="260" step="5" value="${Math.round((itemById(cellSel)?.scale || 1) * 100)}"><span class="cx-val">${Math.round((itemById(cellSel)?.scale || 1) * 100)}</span></div><div class="cx-note">点画布里的小图可选中，拖动平移、用此滑杆或滚轮缩放。</div>` : ''}
+    ${C.settings.pinstyle === 'free' ? `<button class="cx-add" id="cx-free-reset" style="width:100%;margin-top:6px">重新铺开自由图片</button>` : ''}
+  `;
 }
 
 function renderPub() {
@@ -266,15 +344,26 @@ function renderSmall() {
     <div class="cx-row cx-check"><label><input type="checkbox" data-small="shadowOn" ${s.shadowOn ? 'checked' : ''}> 小图阴影</label></div>
   `;
 }
-function renderTextBlock() {
+function itemById(id) { return C.items.find(it => it.frameId === id); }
+function renderSchemeBlock() {
+  const schemes = getSchemes(), presets = getPresets();
   return `
+    <div class="cx-flabel">当前拼图方案（含图片，可继续编辑）</div>
+    <div class="cx-row"><select id="cx-scheme-sel" style="flex:1"><option value="">— 选择方案 —</option>${schemes.map((s, i) => `<option value="${i}">${escapeHTML(s.name)}</option>`).join('')}</select></div>
     <div class="cx-addrow">
-      <button class="cx-add" data-addtext="title">+ 总标题</button>
-      <button class="cx-add" data-addtext="subtitle">+ 副标题</button>
-      <button class="cx-add" data-addtext="body">+ 说明文字</button>
-      <button class="cx-add" data-addtext="tag">+ 标签短字</button>
+      <button class="cx-add" id="cx-scheme-new">新建</button>
+      <button class="cx-add" id="cx-scheme-save">保存</button>
+      <button class="cx-add" id="cx-scheme-copy">复制</button>
+      <button class="cx-add" id="cx-scheme-del">删除</button>
     </div>
-    <div id="cx-textstyle">${renderTextStyle()}</div>
+    <div class="cx-flabel">预设方案（只存版式样式，不绑图片）</div>
+    <div class="cx-row"><select id="cx-preset-sel" style="flex:1"><option value="">— 选择预设 —</option>${presets.map((p, i) => `<option value="${i}">${escapeHTML(p.name)}</option>`).join('')}</select></div>
+    <div class="cx-addrow">
+      <button class="cx-add" id="cx-preset-apply">套用</button>
+      <button class="cx-add" id="cx-preset-save">存为预设</button>
+      <button class="cx-add" id="cx-preset-update">更新预设</button>
+    </div>
+    <div class="cx-note">「保存方案」=可回来继续编辑的项目；「导出」=生成最终文件，两者不同。</div>
   `;
 }
 function renderTextStyle() {
@@ -306,8 +395,11 @@ function renderTextStyle() {
 function renderStickerBlock() {
   return `
     <div class="cx-stickers">${STICKERS.map((s, i) => `<button class="cx-stk" data-stk="${i}" title="${escapeHTML(s.name || s.text)}">${s.stype === 'emoji' ? s.glyph : `<span class="cx-stk-pill" style="background:${s.bg};color:${s.color}">${escapeHTML(s.text)}</span>`}</button>`).join('')}</div>
-    <div class="cx-note">点击添加到画布；可拖动/缩放/旋转/删除（选中后按删除键或在画布外点删除）。</div>
-    ${curLayer() && curLayer().kind === 'sticker' ? `<button class="cx-del" data-dellayer="1">删除此贴图</button>` : ''}
+    <div class="cx-addrow" style="margin-top:8px">
+      <button class="cx-add" id="cx-upload-btn">上传贴图</button>
+      <input type="file" id="cx-upload" accept="image/*" style="display:none">
+    </div>
+    <div class="cx-note">点击添加到画布；可拖动/缩放/旋转/删除。也可直接 Ctrl+V 粘贴外部图片作为贴图。</div>
   `;
 }
 function renderExportBlock() {
@@ -338,15 +430,16 @@ export function initCollageExport() {
 }
 
 function loadImages(cb) {
-  const ps = participants();
-  let pending = ps.length;
+  const jobs = [];
+  participants().forEach(s => { if (!imgCache[s.id]) jobs.push({ key: s.id, url: s.dataUrl }); });
+  (C.layers || []).forEach(l => { if (l.kind === 'sticker' && l.stype === 'img' && l.dataUrl && !imgCache[l.id]) jobs.push({ key: l.id, url: l.dataUrl }); });
+  let pending = jobs.length;
   if (pending === 0) { cb?.(); return; }
-  ps.forEach(s => {
-    if (imgCache[s.id]) { if (--pending === 0) cb?.(); return; }
+  jobs.forEach(j => {
     const img = new Image();
-    img.onload = () => { imgCache[s.id] = img; if (--pending === 0) cb?.(); };
+    img.onload = () => { imgCache[j.key] = img; if (--pending === 0) cb?.(); };
     img.onerror = () => { if (--pending === 0) cb?.(); };
-    img.src = s.dataUrl;
+    img.src = j.url;
   });
 }
 
@@ -376,10 +469,16 @@ function drawDesign(c) {
   const framePad = framePadOf(C.settings.frame);
   const pad = C.settings.outerPad + framePad;
   const cx0 = pad, cy0 = pad, cw = designW - pad * 2, ch = designH - pad * 2;
-  drawCells(c, cx0, cy0, cw, ch);
-  drawFrame(c, C.settings.frame);
-  // 文字 / 贴图层
-  (C.layers || []).forEach(l => drawLayer(c, l));
+  lastCells = [];
+  if (C.settings.pinstyle === 'free') {
+    drawFrame(c, C.settings.frame);
+    (C.layers || []).filter(l => l.kind === 'image').forEach(l => drawLayer(c, l));
+    (C.layers || []).filter(l => l.kind !== 'image').forEach(l => drawLayer(c, l));
+  } else {
+    drawCells(c, cx0, cy0, cw, ch);
+    drawFrame(c, C.settings.frame);
+    (C.layers || []).filter(l => l.kind !== 'image').forEach(l => drawLayer(c, l));
+  }
 }
 
 function drawBackground(c) {
@@ -403,36 +502,66 @@ function drawCells(c, x0, y0, w, h) {
     c.textAlign = 'left'; c.textBaseline = 'alphabetic';
     return;
   }
-  const cols = Math.max(1, Math.min(4, C.settings.cols));
-  const rows = Math.ceil(n / cols);
   const gap = C.settings.gap;
-  const cellW = (w - gap * (cols - 1)) / cols;
-  const cellH = (h - gap * (rows - 1)) / rows;
-  const sm = C.settings.small;
-  ps.forEach((s, i) => {
-    const r = Math.floor(i / cols), col = i % cols;
-    const x = x0 + col * (cellW + gap), y = y0 + r * (cellH + gap);
-    const img = imgCache[s.id];
-    c.save();
-    if (sm.shadowOn) { c.shadowColor = 'rgba(0,0,0,0.28)'; c.shadowBlur = 14; c.shadowOffsetY = 5; }
-    roundRect(c, x, y, cellW, cellH, sm.radius);
-    c.clip();
-    if (img) drawCover(c, img, x, y, cellW, cellH);
-    else { c.fillStyle = '#dde5f3'; c.fillRect(x, y, cellW, cellH); }
-    c.restore();
-    if (sm.borderOn && sm.borderWidth > 0) {
-      c.save(); c.lineWidth = sm.borderWidth; c.strokeStyle = sm.borderColor;
-      roundRect(c, x + sm.borderWidth / 2, y + sm.borderWidth / 2, cellW - sm.borderWidth, cellH - sm.borderWidth, Math.max(0, sm.radius - sm.borderWidth / 2));
-      c.stroke(); c.restore();
+  const slots = slotsFor(C.settings.pinstyle, n);
+  let rects = [];
+  if (slots) {
+    const k = Math.min(slots.length, n);
+    for (let i = 0; i < k; i++) {
+      const s = slots[i];
+      rects.push({ item: ps[i], x: x0 + s.x * w + gap / 2, y: y0 + s.y * h + gap / 2, w: s.w * w - gap, h: s.h * h - gap, rot: s.rot || 0 });
     }
+  } else {
+    const cols = Math.max(1, Math.min(4, C.settings.cols));
+    const rows = Math.ceil(n / cols);
+    const cellW = (w - gap * (cols - 1)) / cols, cellH = (h - gap * (rows - 1)) / rows;
+    ps.forEach((s, i) => { const r = Math.floor(i / cols), col = i % cols; rects.push({ item: s, x: x0 + col * (cellW + gap), y: y0 + r * (cellH + gap), w: cellW, h: cellH, rot: 0 }); });
+  }
+  rects.forEach(rc => {
+    drawCell(c, rc.item, rc.x, rc.y, rc.w, rc.h, rc.rot);
+    lastCells.push({ itemId: rc.item.id, x: rc.x, y: rc.y, w: rc.w, h: rc.h, rot: rc.rot });
   });
 }
-function drawCover(c, img, x, y, w, h) {
+function drawCell(c, src, x, y, w, h, rot) {
+  const sm = C.settings.small;
+  const it = itemById(src.id) || {};
+  const img = imgCache[src.id];
+  const sel = src.id === cellSel;
+  c.save();
+  if (rot) { const ccx = x + w / 2, ccy = y + h / 2; c.translate(ccx, ccy); c.rotate(rot * Math.PI / 180); c.translate(-ccx, -ccy); }
+  c.save();
+  if (sm.shadowOn || rot) { c.shadowColor = 'rgba(0,0,0,0.28)'; c.shadowBlur = 14; c.shadowOffsetY = 5; }
+  roundRect(c, x, y, w, h, sm.radius); c.clip();
+  if (rot) { c.fillStyle = '#fff'; c.fillRect(x, y, w, h); }
+  if (img) drawCover(c, img, x, y, w, h, it.scale || 1, it.offX || 0, it.offY || 0);
+  else { c.fillStyle = '#dde5f3'; c.fillRect(x, y, w, h); }
+  c.restore();
+  if (sm.borderOn && sm.borderWidth > 0) { c.save(); c.lineWidth = sm.borderWidth; c.strokeStyle = sm.borderColor; roundRect(c, x + sm.borderWidth / 2, y + sm.borderWidth / 2, w - sm.borderWidth, h - sm.borderWidth, Math.max(0, sm.radius - sm.borderWidth / 2)); c.stroke(); c.restore(); }
+  if (sel) { c.save(); c.lineWidth = 4; c.strokeStyle = '#1d5fe7'; roundRect(c, x + 2, y + 2, w - 4, h - 4, sm.radius); c.stroke(); c.restore(); }
+  c.restore();
+}
+function drawCover(c, img, x, y, w, h, scale, offX, offY) {
+  scale = scale || 1;
   const ir = img.naturalWidth / img.naturalHeight, cr = w / h;
-  let sw, sh, sx, sy;
-  if (ir > cr) { sh = img.naturalHeight; sw = sh * cr; sx = (img.naturalWidth - sw) / 2; sy = 0; }
-  else { sw = img.naturalWidth; sh = sw / cr; sx = 0; sy = (img.naturalHeight - sh) / 2; }
-  c.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+  let dw, dh;
+  if (ir > cr) { dh = h * scale; dw = dh * ir; } else { dw = w * scale; dh = dw / ir; }
+  const maxX = (dw - w) / 2, maxY = (dh - h) / 2;
+  const dx = x + (w - dw) / 2 + (offX || 0) * maxX, dy = y + (h - dh) / 2 + (offY || 0) * maxY;
+  c.drawImage(img, dx, dy, dw, dh);
+}
+function drawImageLayer(c, l) {
+  const img = imgCache[l.frameId];
+  if (!img) { l._box = null; return; }
+  const base = designW * 0.4 * (l.scale || 1);
+  const ir = img.naturalWidth / img.naturalHeight;
+  let w = base, h = base / ir;
+  const cx0 = l.xPct * designW, cy0 = l.yPct * designH;
+  const rot = (l.rotate || 0) * Math.PI / 180;
+  c.save(); c.translate(cx0, cy0); if (rot) c.rotate(rot);
+  c.shadowColor = 'rgba(0,0,0,0.25)'; c.shadowBlur = 12; c.shadowOffsetY = 4;
+  c.drawImage(img, -w / 2, -h / 2, w, h);
+  c.restore();
+  l._box = { x: cx0 - w / 2, y: cy0 - h / 2, w, h };
 }
 
 function framePadOf(frame) {
@@ -458,7 +587,7 @@ function drawFrame(c, frame) {
     case '木纹菜单': c.fillStyle = '#7a4a23'; outerBand(c, fp); stroke('#4d2e15', W * 0.012, fp * 0.4, 6); break;
     case '黑金高级': c.fillStyle = '#111111'; outerBand(c, fp); stroke('#c9a44a', W * 0.006, fp * 0.45, 4); break;
     case '虚线手账': c.setLineDash([W * 0.02, W * 0.012]); stroke('#9aa7c0', W * 0.006, fp * 0.5, 14); c.setLineDash([]); break;
-    case '拍立得': c.fillStyle = '#ffffff'; c.fillRect(0, 0, W, H); /* 底部更厚留白通过 pad 已实现，额外加重底部 */ c.fillStyle = '#ffffff'; c.fillRect(0, H - fp * 2, W, fp * 2); break;
+    case '拍立得': c.fillStyle = '#ffffff'; outerBand(c, fp); c.fillRect(0, H - fp * 1.6, W, fp * 1.6); break;
     case '胶片': drawFilm(c, fp); break;
   }
   c.restore();
@@ -495,6 +624,7 @@ function hexA(hex, a) {
 // ===== 图层（文字 / 贴图）=====
 function drawLayer(c, l) {
   if (inlineEdit.active && l.id === inlineEdit.id) { return; }
+  if (l.kind === 'image') return drawImageLayer(c, l);
   if (l.kind === 'sticker') return drawSticker(c, l);
   return drawText(c, l);
 }
@@ -532,7 +662,11 @@ function drawSticker(c, l) {
   c.save();
   c.translate(cx0, cy0); if (rot) c.rotate(rot);
   let bw, bh;
-  if (l.stype === 'emoji') {
+  if (l.stype === 'img') {
+    const img = imgCache[l.id];
+    if (img) { const ir = img.naturalWidth / img.naturalHeight; bw = size; bh = size / ir; c.drawImage(img, -bw / 2, -bh / 2, bw, bh); }
+    else { bw = size; bh = size; c.fillStyle = '#dde5f3'; c.fillRect(-bw / 2, -bh / 2, bw, bh); }
+  } else if (l.stype === 'emoji') {
     c.font = `${size}px ${FONT_STACK}`; c.textAlign = 'center'; c.textBaseline = 'middle';
     c.fillText(l.glyph, 0, 0);
     bw = size; bh = size;
@@ -571,17 +705,25 @@ function renderHandles() {
   const box = document.createElement('div'); box.className = 'cx-selbox';
   box.style.cssText = `left:${x}px;top:${y}px;width:${w}px;height:${h}px;`; wrapEl.appendChild(box);
   const hs = 7;
-  const handles = l.kind === 'sticker'
+  const uniform = l.kind === 'sticker' || l.kind === 'image';
+  const handles = uniform
     ? [['se', w, h, 'nwse-resize']]
     : [['nw', 0, 0, 'nwse-resize'], ['ne', w, 0, 'nesw-resize'], ['sw', 0, h, 'nesw-resize'], ['se', w, h, 'nwse-resize'], ['e', w, h / 2, 'ew-resize'], ['w', 0, h / 2, 'ew-resize'], ['n', w / 2, 0, 'ns-resize'], ['s', w / 2, h, 'ns-resize']];
   handles.forEach(([hh, hx, hy, cur]) => { const d = document.createElement('div'); d.className = 'cx-rh'; d.dataset.rh = hh; d.style.cssText = `left:${x + hx - hs}px;top:${y + hy - hs}px;cursor:${cur};`; wrapEl.appendChild(d); });
+  // 删除按钮（选中框右上角）
+  const del = document.createElement('div'); del.className = 'cx-delbtn'; del.dataset.delbtn = '1'; del.title = '删除'; del.textContent = '×';
+  del.style.cssText = `left:${x + w - 4}px;top:${y - 14}px;`; wrapEl.appendChild(del);
   // 旋转手柄
   const rs = document.createElement('div'); rs.className = 'cx-rot-stem'; rs.style.cssText = `left:${x + w / 2}px;top:${y - 24}px;height:24px;`; wrapEl.appendChild(rs);
   const rh = document.createElement('div'); rh.className = 'cx-rot'; rh.dataset.rot = '1'; rh.style.cssText = `left:${x + w / 2 - 9}px;top:${y - 24 - 9}px;`; wrapEl.appendChild(rh);
 }
 
 // ===== 事件 =====
-function bindAll() { bindCanvas(); bindRight(); bindQueue(); window.addEventListener('resize', onResize); bindTop(); }
+function bindAll() {
+  bindCanvas(); bindRight(); bindQueue(); window.addEventListener('resize', onResize); bindTop();
+  document.addEventListener('keydown', onKeyDown);
+  document.addEventListener('paste', handlePaste);
+}
 function onResize() { sizeCanvas(); redraw(); }
 function bindTop() {
   document.getElementById('cx-copy')?.addEventListener('click', copyCopy);
@@ -591,23 +733,44 @@ function bindTop() {
 function bindCanvas() {
   const wrapEl = document.getElementById('cx-canvas-wrap');
   if (!wrapEl || !canvas) return;
+  const isFree = () => C.settings.pinstyle === 'free';
   canvas.addEventListener('mousedown', e => {
     const r = canvas.getBoundingClientRect();
     const px = (e.clientX - r.left) / sPrev, py = (e.clientY - r.top) / sPrev;
     if (inlineEdit.active) commitInline();
     const layers = C.layers || [];
     let hit = null;
-    for (let i = layers.length - 1; i >= 0; i--) { const b = layers[i]._box; if (b && px >= b.x - 6 && px <= b.x + b.w + 6 && py >= b.y - 6 && py <= b.y + b.h + 6) { hit = layers[i]; break; } }
+    for (let i = layers.length - 1; i >= 0; i--) { const l = layers[i]; if (l.kind === 'image' && !isFree()) continue; const b = l._box; if (b && px >= b.x - 6 && px <= b.x + b.w + 6 && py >= b.y - 6 && py <= b.y + b.h + 6) { hit = l; break; } }
     if (hit) {
-      const changed = selectedLayerId !== hit.id; selectedLayerId = hit.id;
+      const changed = selectedLayerId !== hit.id; selectedLayerId = hit.id; cellSel = null;
       drag = { active: true, id: hit.id, ox: px - hit.xPct * designW, oy: py - hit.yPct * designH };
       if (changed) refreshTextStyle();
-      redraw(); e.preventDefault();
-    } else if (selectedLayerId) { selectedLayerId = null; refreshTextStyle(); redraw(); }
+      redraw(); e.preventDefault(); return;
+    }
+    // 命中格子（规则/不规则模式）→ 选中并可平移小图
+    if (!isFree()) {
+      const cell = [...lastCells].reverse().find(rc => px >= rc.x && px <= rc.x + rc.w && py >= rc.y && py <= rc.y + rc.h);
+      if (cell) {
+        cellSel = cell.itemId; selectedLayerId = null;
+        const it = itemById(cell.itemId) || {};
+        cellDrag = { active: true, id: cell.itemId, sx: px, sy: py, ox0: it.offX || 0, oy0: it.offY || 0, cw: cell.w, ch: cell.h };
+        refreshTextStyle(); refreshPinZoom(); redraw(); e.preventDefault(); return;
+      }
+    }
+    if (selectedLayerId || cellSel) { selectedLayerId = null; cellSel = null; refreshTextStyle(); refreshPinZoom(); redraw(); }
   });
   document.addEventListener('mousemove', onMove);
   document.addEventListener('mouseup', onUp);
+  canvas.addEventListener('wheel', e => {
+    if (isFree() || !cellSel) return;
+    e.preventDefault();
+    const it = itemById(cellSel); if (!it) return;
+    it.scale = Math.max(1, Math.min(2.6, (it.scale || 1) + (e.deltaY < 0 ? 0.06 : -0.06)));
+    redraw(); refreshPinZoom();
+  }, { passive: false });
   wrapEl.addEventListener('mousedown', e => {
+    const db = e.target.closest('.cx-delbtn');
+    if (db) { e.preventDefault(); e.stopPropagation(); delLayer(); return; }
     const rot = e.target.closest('.cx-rot');
     if (rot) { const l = curLayer(); if (!l || !l._box) return; e.preventDefault(); e.stopPropagation();
       const r = canvas.getBoundingClientRect(); const ccx = (l._box.x + l._box.w / 2), ccy = (l._box.y + l._box.h / 2);
@@ -615,7 +778,7 @@ function bindCanvas() {
       rotateDrag = { active: true, id: l.id, cx: ccx, cy: ccy, a0: Math.atan2(py - ccy, px - ccx), r0: l.rotate || 0 }; return; }
     const hd = e.target.closest('.cx-rh');
     if (hd) { const l = curLayer(); if (!l || !l._box) return; e.preventDefault(); e.stopPropagation();
-      resize = { active: true, id: l.id, handle: hd.dataset.rh, sx: e.clientX, sy: e.clientY, startFont: l.fontSize || 0, startW: l.textWidth || designW * 0.9, startBoxW: l._box.w, startBoxH: l._box.h, startSize: l.size || 0 }; }
+      resize = { active: true, id: l.id, handle: hd.dataset.rh, sx: e.clientX, sy: e.clientY, startFont: l.fontSize || 0, startW: l.textWidth || designW * 0.9, startBoxW: l._box.w, startBoxH: l._box.h, startSize: l.size || 0, startScale: l.scale || 1 }; }
   });
   canvas.addEventListener('dblclick', e => {
     const r = canvas.getBoundingClientRect();
@@ -627,19 +790,20 @@ function bindCanvas() {
 function onMove(e) {
   const r = canvas?.getBoundingClientRect(); if (!r) return;
   const px = (e.clientX - r.left) / sPrev, py = (e.clientY - r.top) / sPrev;
+  if (cellDrag.active) { const it = itemById(cellDrag.id); if (!it) return; it.offX = Math.max(-1, Math.min(1, cellDrag.ox0 + (px - cellDrag.sx) / (cellDrag.cw * 0.5))); it.offY = Math.max(-1, Math.min(1, cellDrag.oy0 + (py - cellDrag.sy) / (cellDrag.ch * 0.5))); redraw(); return; }
   if (rotateDrag.active) { const l = layerById(rotateDrag.id); if (!l) return; const a = Math.atan2(py - rotateDrag.cy, px - rotateDrag.cx); let d = rotateDrag.r0 + (a - rotateDrag.a0) * 180 / Math.PI; d = ((d + 180) % 360 + 360) % 360 - 180; l.rotate = Math.round(d); redraw(); return; }
   if (drag.active) { const l = layerById(drag.id); if (!l) return; l.xPct = (px - drag.ox) / designW; l.yPct = (py - drag.oy) / designH; redraw(); return; }
   if (resize.active) {
     const l = layerById(resize.id); if (!l) return;
     const dx = e.clientX - resize.sx, dy = e.clientY - resize.sy;
-    if (l.kind === 'sticker') { const base = Math.max(20, resize.startBoxW * sPrev); const f = Math.max(0.2, (base + dx) / base); l.size = Math.max(24, Math.round(resize.startSize * f)); }
+    if (l.kind === 'sticker' || l.kind === 'image') { const base = Math.max(20, resize.startBoxW * sPrev); const f = Math.max(0.2, (base + dx) / base); if (l.kind === 'image') l.scale = Math.max(0.1, (resize.startScale || 1) * f); else l.size = Math.max(24, Math.round(resize.startSize * f)); }
     else if (['nw', 'ne', 'sw', 'se'].includes(resize.handle)) { const dirX = (resize.handle === 'se' || resize.handle === 'ne') ? 1 : -1; const dirY = (resize.handle === 'se' || resize.handle === 'sw') ? 1 : -1; const eff = Math.abs(dx * dirX) >= Math.abs(dy * dirY) ? dx * dirX : dy * dirY; const base = Math.max(20, resize.startBoxW * sPrev); const f = Math.max(0.2, (base + eff) / base); l.fontSize = Math.max(12, Math.round(resize.startFont * f)); l.textWidth = Math.max(40, Math.round(resize.startW * f)); }
     else if (resize.handle === 'e' || resize.handle === 'w') { const dir = resize.handle === 'w' ? -1 : 1; l.textWidth = Math.max(40, Math.round(resize.startW + (dx * dir) / sPrev)); }
     else { const dir = resize.handle === 's' ? 1 : -1; const base = Math.max(20, resize.startBoxH * sPrev); const f = Math.max(0.2, (base + dy * dir) / base); l.fontSize = Math.max(12, Math.round(resize.startFont * f)); }
     redraw(); syncStyleVals(l); return;
   }
 }
-function onUp() { drag.active = false; resize.active = false; if (rotateDrag.active) { rotateDrag.active = false; refreshTextStyle(); } }
+function onUp() { drag.active = false; resize.active = false; cellDrag.active = false; if (rotateDrag.active) { rotateDrag.active = false; refreshTextStyle(); } }
 function layerById(id) { return (C.layers || []).find(l => l.id === id); }
 
 // 画布内联编辑
@@ -667,18 +831,32 @@ function commitInline() {
 function bindRight() {
   const right = document.getElementById('cx-right'); if (!right) return;
   right.addEventListener('click', e => {
+    const rt = e.target.closest('[data-rtab]'); if (rt && rt.parentElement && rt.parentElement.id === 'cx-right-tabs') { rightTab = rt.dataset.rtab; const d = document.getElementById('cx-right-dual'); if (d) d.dataset.rtab = rightTab; document.querySelectorAll('#cx-right-tabs [data-rtab]').forEach(b => b.classList.toggle('active', b === rt)); return; }
     const acc = e.target.closest('[data-acc-toggle]'); if (acc) { const k = acc.dataset.accToggle; accordion[k] = !accordion[k]; refreshRight(); return; }
     handleRightClick(e);
   });
   right.addEventListener('input', handleRightInput);
+  right.addEventListener('change', e => { if (e.target.id === 'cx-upload') handleUpload(e); });
 }
 function handleRightClick(e) {
   const t = e.target;
   const pub = t.closest('[data-pub]'); if (pub) { C.settings.ratio = pub.dataset.pub; applyRatio(C.settings.ratio); refreshRight(); sizeCanvas(); redraw(); return; }
   const ra = t.closest('[data-ratio]'); if (ra) { C.settings.ratio = ra.dataset.ratio; applyRatio(C.settings.ratio); refreshRight(); sizeCanvas(); redraw(); return; }
-  const la = t.closest('[data-layout]'); if (la) { const L = LAYOUTS.find(x => x.id === la.dataset.layout); C.settings.layout = L.id; C.settings.cols = L.cols; refreshRight(); redraw(); return; }
+  const la = t.closest('[data-layout]'); if (la) { const L = LAYOUTS.find(x => x.id === la.dataset.layout); C.settings.layout = L.id; C.settings.cols = L.cols; C.settings.pinstyle = 'grid'; refreshRight(); redraw(); return; }
+  const pin = t.closest('[data-pin]'); if (pin) { C.settings.pinstyle = pin.dataset.pin; cellSel = null; if (C.settings.pinstyle === 'free') ensureFreeImages(); refreshRight(); loadImages(() => redraw()); return; }
+  if (t.id === 'cx-free-reset') { resetFreeImages(); loadImages(() => redraw()); return; }
   const bg = t.closest('[data-bg]'); if (bg) { const b = BG_PRESETS.find(x => x.id === bg.dataset.bg); C.settings.bg = { ...b }; refreshRight(); redraw(); return; }
   const fr = t.closest('[data-frame]'); if (fr) { C.settings.frame = fr.dataset.frame; refreshRight(); redraw(); return; }
+  // 上传贴图
+  if (t.id === 'cx-upload-btn') { document.getElementById('cx-upload')?.click(); return; }
+  // 方案
+  if (t.id === 'cx-scheme-new') { schemeNew(); return; }
+  if (t.id === 'cx-scheme-save') { schemeSave(); return; }
+  if (t.id === 'cx-scheme-copy') { schemeCopy(); return; }
+  if (t.id === 'cx-scheme-del') { schemeDel(); return; }
+  if (t.id === 'cx-preset-apply') { presetApply(); return; }
+  if (t.id === 'cx-preset-save') { presetSave(); return; }
+  if (t.id === 'cx-preset-update') { presetUpdate(); return; }
   const at = t.closest('[data-addtext]'); if (at) { addText(at.dataset.addtext); return; }
   const al = t.closest('[data-align]'); if (al) { const l = curLayer(); if (l) { l.align = al.dataset.align; redraw(); refreshTextStyle(); } return; }
   const sw = t.closest('[data-colorfor]'); if (sw) { const l = curLayer(); if (l) { l[sw.dataset.colorfor] = sw.dataset.color; redraw(); refreshTextStyle(); } return; }
@@ -693,6 +871,8 @@ function handleRightClick(e) {
 }
 function handleRightInput(e) {
   const t = e.target;
+  if (t.id === 'cx-scheme-sel') { if (t.value !== '') schemeLoad(+t.value); return; }
+  const cz = t.closest('[data-cellzoom]'); if (cz) { const it = itemById(cellSel); if (it) { it.scale = parseFloat(t.value) / 100; const sp = cz.querySelector('.cx-val'); if (sp) sp.textContent = Math.round(parseFloat(t.value)); redraw(); } return; }
   const set = t.closest('[data-set]'); if (set) { const k = set.dataset.set; const v = parseFloat(t.value); setNum(k, v); const sp = set.querySelector('.cx-val'); if (sp) sp.textContent = Math.round(v); redraw(); return; }
   if (t.dataset.setColor) { C.settings.bg = { id: 'custom', type: 'solid', color: t.value }; redraw(); return; }
   if (t.dataset.small) { const k = t.dataset.small; C.settings.small[k] = t.type === 'checkbox' ? t.checked : t.value; redraw(); return; }
@@ -748,9 +928,66 @@ function addText(kind) {
 function addSticker(i) {
   const s = STICKERS[i]; if (!s) return; C.layers = C.layers || [];
   const l = { id: 'S-' + Date.now() + Math.random().toString(36).slice(2, 5), kind: 'sticker', stype: s.stype, glyph: s.glyph, text: s.text, bg: s.bg, color: s.color, size: 140, xPct: 0.5, yPct: 0.5, rotate: 0 };
-  C.layers.push(l); selectedLayerId = l.id; refreshStickerDel(); redraw();
+  C.layers.push(l); selectedLayerId = l.id; redraw(); renderHandles();
 }
-function delLayer() { const i = (C.layers || []).findIndex(l => l.id === selectedLayerId); if (i < 0) return; if (!window.confirm('删除这个图层？')) return; C.layers.splice(i, 1); selectedLayerId = null; refreshTextStyle(); refreshStickerDel(); redraw(); }
+function addImageSticker(dataUrl) {
+  C.layers = C.layers || [];
+  const l = { id: 'S-' + Date.now() + Math.random().toString(36).slice(2, 5), kind: 'sticker', stype: 'img', dataUrl, size: designW * 0.3, xPct: 0.5, yPct: 0.5, rotate: 0 };
+  C.layers.push(l); selectedLayerId = l.id;
+  loadImages(() => { redraw(); renderHandles(); });
+  toast('已加入贴图');
+}
+function delLayer() { const i = (C.layers || []).findIndex(l => l.id === selectedLayerId); if (i < 0) return; C.layers.splice(i, 1); selectedLayerId = null; refreshTextStyle(); redraw(); }
+
+// ===== 自由摆放：用图片图层承载 =====
+function ensureFreeImages() {
+  C.layers = C.layers || [];
+  const ps = participants();
+  const have = new Set(C.layers.filter(l => l.kind === 'image').map(l => l.frameId));
+  // 移除已不参与的图片层
+  C.layers = C.layers.filter(l => l.kind !== 'image' || ps.find(p => p.id === l.frameId));
+  ps.forEach((p, i) => {
+    if (have.has(p.id)) return;
+    const col = i % 2, row = Math.floor(i / 2);
+    C.layers.push({ id: 'IMG-' + p.id, kind: 'image', frameId: p.id, xPct: 0.3 + col * 0.4, yPct: 0.28 + row * 0.32, scale: 1, rotate: 0 });
+  });
+}
+function resetFreeImages() { C.layers = (C.layers || []).filter(l => l.kind !== 'image'); ensureFreeImages(); selectedLayerId = null; }
+function refreshPinZoom() { const acc = document.querySelector('.cx-acc[data-acc="pin"] .cx-acc-body'); if (acc) acc.innerHTML = renderPinStyle(); }
+
+// ===== 方案 / 预设（localStorage）=====
+function getSchemes() { try { return JSON.parse(localStorage.getItem('cxSchemes') || '[]'); } catch { return []; } }
+function setSchemes(a) { localStorage.setItem('cxSchemes', JSON.stringify(a)); }
+function getPresets() { try { return JSON.parse(localStorage.getItem('cxPresets') || '[]'); } catch { return []; } }
+function setPresets(a) { localStorage.setItem('cxPresets', JSON.stringify(a)); }
+function snapshot() { return JSON.parse(JSON.stringify({ items: C.items, layers: (C.layers || []).map(l => { const { _box, ...r } = l; return r; }), settings: C.settings })); }
+function loadSnapshot(s) { C.items = JSON.parse(JSON.stringify(s.items || [])); C.layers = JSON.parse(JSON.stringify(s.layers || [])); C.settings = JSON.parse(JSON.stringify(s.settings || C.settings)); }
+function schemeNew() { const name = prompt('新方案名称：', '方案' + (getSchemes().length + 1)); if (!name) return; const a = getSchemes(); a.push({ name: name.trim(), snap: snapshot() }); setSchemes(a); toast('已新建方案'); refreshRight(); }
+function schemeSave() { const sel = document.getElementById('cx-scheme-sel'); const a = getSchemes(); if (sel && sel.value !== '') { a[+sel.value].snap = snapshot(); setSchemes(a); toast('已保存到当前方案'); } else { schemeNew(); } }
+function schemeCopy() { const sel = document.getElementById('cx-scheme-sel'); const a = getSchemes(); if (!sel || sel.value === '') { toast('请先选择要复制的方案'); return; } const src = a[+sel.value]; a.push({ name: src.name + ' 副本', snap: JSON.parse(JSON.stringify(src.snap)) }); setSchemes(a); toast('已复制方案'); refreshRight(); }
+function schemeDel() { const sel = document.getElementById('cx-scheme-sel'); const a = getSchemes(); if (!sel || sel.value === '') { toast('请先选择要删除的方案'); return; } if (!window.confirm('删除该方案？')) return; a.splice(+sel.value, 1); setSchemes(a); toast('已删除方案'); refreshRight(); }
+function schemeLoad(i) { const a = getSchemes(); if (!a[i]) return; loadSnapshot(a[i].snap); selectedLayerId = null; cellSel = null; applyRatio(C.settings.ratio); imgCache = {}; refreshRight(); refreshQueue(); loadImages(() => { sizeCanvas(); redraw(); }); toast(`已载入方案：${a[i].name}`); }
+function presetSnapshot() { const s = JSON.parse(JSON.stringify(C.settings)); const layers = (C.layers || []).filter(l => l.kind !== 'image').map(l => { const { _box, dataUrl, ...r } = l; return r; }); return { settings: s, layers }; }
+function presetSave() { const name = prompt('预设方案名称：'); if (!name) return; const a = getPresets(); a.push({ name: name.trim(), ...presetSnapshot() }); setPresets(a); toast('已保存为预设'); refreshRight(); }
+function presetUpdate() { const sel = document.getElementById('cx-preset-sel'); const a = getPresets(); if (!sel || sel.value === '') { toast('请先选择要更新的预设'); return; } const ps = presetSnapshot(); a[+sel.value].settings = ps.settings; a[+sel.value].layers = ps.layers; setPresets(a); toast('已更新预设'); }
+function presetApply() { const sel = document.getElementById('cx-preset-sel'); const a = getPresets(); if (!sel || sel.value === '') { toast('请先选择一个预设'); return; } const p = a[+sel.value]; C.settings = JSON.parse(JSON.stringify(p.settings)); C.layers = (C.layers || []).filter(l => l.kind === 'image').concat(JSON.parse(JSON.stringify(p.layers || []))); applyRatio(C.settings.ratio); selectedLayerId = null; cellSel = null; refreshRight(); refreshQueue(); loadImages(() => { sizeCanvas(); redraw(); }); toast(`已套用预设：${p.name}（不含图片）`); }
+
+// ===== 上传 / 粘贴贴图 =====
+function handleUpload(e) {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  const rd = new FileReader(); rd.onload = ev => addImageSticker(ev.target.result); rd.readAsDataURL(f);
+  e.target.value = '';
+}
+function handlePaste(e) {
+  const items = (e.clipboardData || {}).items; if (!items) return;
+  for (const it of items) { if (it.type && it.type.indexOf('image') === 0) { const f = it.getAsFile(); if (f) { const rd = new FileReader(); rd.onload = ev => addImageSticker(ev.target.result); rd.readAsDataURL(f); e.preventDefault(); break; } } }
+}
+function onKeyDown(e) {
+  if (!document.getElementById('cx-canvas')) return; // 非本页
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || inlineEdit.active) return;
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selectedLayerId) { e.preventDefault(); delLayer(); }
+}
 
 // ===== 导出 =====
 function renderFull(scale) {

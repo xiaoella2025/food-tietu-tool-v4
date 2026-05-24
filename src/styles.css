@@ -1914,7 +1914,7 @@ textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(
 /* ===================================================================== */
 /* 拼图导出 / 出成品图 (cx-) */
 /* ===================================================================== */
-.cx { display: grid; grid-template-columns: minmax(0,1fr) 360px; gap: 10px; height: calc(100vh - 58px - 24px); }
+.cx { display: grid; grid-template-columns: minmax(0,1fr) 560px; gap: 10px; height: calc(100vh - 58px - 24px); }
 .cx-main { grid-column: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .cx-right { grid-column: 2; display: flex; flex-direction: column; min-height: 0; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; }
 .cx-toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); margin-bottom: 8px; }
@@ -1983,5 +1983,23 @@ textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(
 .cx-stk-pill { font-size: 11px; font-weight: 800; padding: 2px 6px; border-radius: 999px; }
 .cx-ckline { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; margin: 5px 0; }
 
-@media (max-width: 1100px) { .cx { grid-template-columns: minmax(0,1fr) 300px; } }
-@media (max-width: 860px) { .cx { grid-template-columns: minmax(0,1fr); grid-template-rows: minmax(0,1fr) auto; } .cx-right { grid-column: 1; max-height: 320px; } }
+/* (响应式规则见文件末尾拼图导出返工2块) */
+
+/* 拼图导出返工2：双工作区 / 删除按钮 / 上传 */
+.cx-right-tabs { display: none; gap: 6px; padding: 8px 8px 0; }
+.cx-right-tabs button { flex: 1; height: 32px; font-size: 13px; font-weight: 800; }
+.cx-right-tabs button.active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+.cx-right-dual { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 8px; }
+.cx-ws { min-height: 0; overflow-y: auto; border: 1px solid rgba(200,216,248,0.6); border-radius: var(--radius-md); padding: 8px; }
+.cx-ws-title { font-size: 13px; font-weight: 800; padding: 2px 2px 8px; border-bottom: 1px solid rgba(200,216,248,0.6); margin-bottom: 8px; }
+.cx-delbtn { position: absolute; width: 20px; height: 20px; border-radius: 50%; background: #d42a2a; color: #fff; font-size: 14px; font-weight: 800; line-height: 18px; text-align: center; pointer-events: all; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
+@media (min-width: 1500px) { .cx { grid-template-columns: minmax(0,1fr) 600px; } }
+@media (max-width: 1180px) {
+  .cx { grid-template-columns: minmax(0,1fr) 340px; }
+  .cx-right-tabs { display: flex; }
+  .cx-right-dual { display: block; }
+  .cx-ws { display: none; margin-bottom: 8px; }
+  .cx-right-dual[data-rtab="set"] .cx-ws-set { display: block; }
+  .cx-right-dual[data-rtab="text"] .cx-ws-text { display: block; }
+}
+@media (max-width: 860px) { .cx { grid-template-columns: minmax(0,1fr); grid-template-rows: minmax(0,1fr) auto; } .cx-right { grid-column: 1; max-height: 340px; } }

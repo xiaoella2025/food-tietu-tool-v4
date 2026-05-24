@@ -40,7 +40,7 @@ const state = {
     layers: [],
     settings: {
       ratio: '3:4', customW: 3, customH: 4,
-      layout: 'g4', cols: 2, gap: 12, outerPad: 24,
+      layout: 'g4', cols: 2, pinstyle: 'grid', gap: 12, outerPad: 24,
       bg: { id: 'white', type: 'solid', color: '#ffffff' },
       frame: '无边框',
       small: { borderOn: false, borderColor: '#ffffff', borderWidth: 6, radius: 12, shadowOn: false },
