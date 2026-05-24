@@ -20,10 +20,20 @@ const RATIOS = ['原图', '1:1', '3:4', '4:3', '16:9', '9:16', '2:1', '2.35:1'];
 const COLOR_PRESETS = ['#ffffff', '#000000', '#ffd24d', '#ff5252', '#3aa0ff', '#1aa760'];
 const TITLE_SAMPLES = ['家常美味做法', '简单又好吃', '一看就会做', '好吃不复杂', '今日家常菜'];
 
+// 艺术字预设：整套样式（含字号/描边/阴影/背景/边框/旋转/竖排等），不只是改颜色
 const ART_PRESETS = {
-  'yellow-black': { label: '黄字黑边', style: { color: '#ffd24d', bold: true, strokeOn: true, strokeColor: '#000000', strokeWidth: 8, shadowOn: false, bgOn: false } },
-  'black-clean':  { label: '黑字简洁', style: { color: '#111111', bold: true, strokeOn: false, strokeWidth: 0, shadowOn: false, bgOn: true, bgColor: '#ffffff', bgAlpha: 0.85 } },
-  'warm':         { label: '养生暖色', style: { color: '#ffffff', bold: true, strokeOn: true, strokeColor: '#8b4513', strokeWidth: 5, shadowOn: true, shadowColor: '#000000', bgOn: true, bgColor: '#d4860a', bgAlpha: 0.8 } },
+  'title-yb':   { label: '黄字黑边大标题', style: { fontSize: 96, bold: true, color: '#ffd24d', align: 'center', strokeOn: true, strokeColor: '#000000', strokeWidth: 12, shadowOn: false, bgOn: false, borderOn: false, rotate: 0, vertical: false, lineHeight: 1.2 } },
+  'title-wb':   { label: '白字黑边大标题', style: { fontSize: 92, bold: true, color: '#ffffff', align: 'center', strokeOn: true, strokeColor: '#000000', strokeWidth: 10, shadowOn: false, bgOn: false, borderOn: false, rotate: 0, vertical: false, lineHeight: 1.2 } },
+  'hot-ry':     { label: '红黄爆款标题', style: { fontSize: 100, bold: true, color: '#fff200', align: 'center', strokeOn: true, strokeColor: '#d42a2a', strokeWidth: 14, shadowOn: true, shadowColor: '#7a0000', bgOn: false, borderOn: false, rotate: 0, vertical: false, lineHeight: 1.15 } },
+  'tag-bw':     { label: '黑底白字标签', style: { fontSize: 46, bold: true, color: '#ffffff', align: 'center', strokeOn: false, strokeWidth: 0, shadowOn: false, bgOn: true, bgColor: '#111111', bgAlpha: 0.9, bgRadius: 6, borderOn: false, rotate: 0, vertical: false, lineHeight: 1.2 } },
+  'tag-cream':  { label: '米色养生标签', style: { fontSize: 46, bold: true, color: '#5b4327', align: 'center', strokeOn: false, strokeWidth: 0, shadowOn: false, bgOn: true, bgColor: '#f3e6c8', bgAlpha: 0.95, bgRadius: 18, borderOn: true, borderColor: '#caa46a', borderWidth: 3, rotate: 0, vertical: false, lineHeight: 1.2 } },
+  'slant':      { label: '斜切封面字', style: { fontSize: 88, bold: true, color: '#ffffff', align: 'center', strokeOn: true, strokeColor: '#1d5fe7', strokeWidth: 8, shadowOn: true, shadowColor: '#000000', bgOn: false, borderOn: false, rotate: -8, vertical: false, lineHeight: 1.2 } },
+  'step-num':   { label: '步骤编号贴纸', style: { fontSize: 60, bold: true, color: '#ffffff', align: 'center', strokeOn: false, strokeWidth: 0, shadowOn: false, bgOn: true, bgColor: '#d42a2a', bgAlpha: 1, bgRadius: 999, borderOn: true, borderColor: '#ffffff', borderWidth: 4, rotate: 0, vertical: false, lineHeight: 1 } },
+  'bubble':     { label: '圆角气泡字', style: { fontSize: 50, bold: true, color: '#1352d8', align: 'center', strokeOn: false, strokeWidth: 0, shadowOn: true, shadowColor: 'rgba(0,0,0,0.25)', bgOn: true, bgColor: '#ffffff', bgAlpha: 0.95, bgRadius: 28, borderOn: true, borderColor: '#1d5fe7', borderWidth: 3, rotate: 0, vertical: false, lineHeight: 1.2 } },
+  'vertical':   { label: '竖排小标签', style: { fontSize: 44, bold: true, color: '#ffffff', align: 'center', strokeOn: true, strokeColor: '#1a6b3a', strokeWidth: 4, shadowOn: false, bgOn: true, bgColor: '#1a9a5a', bgAlpha: 0.92, bgRadius: 10, borderOn: false, rotate: 0, vertical: true, lineHeight: 1.25 } },
+  'shadow-3d':  { label: '阴影立体字', style: { fontSize: 84, bold: true, color: '#ffffff', align: 'center', strokeOn: true, strokeColor: '#333333', strokeWidth: 4, shadowOn: true, shadowColor: '#000000', bgOn: false, borderOn: false, rotate: 0, vertical: false, lineHeight: 1.2 } },
+  'double-line':{ label: '双层描边标题', style: { fontSize: 90, bold: true, color: '#ff5252', align: 'center', strokeOn: true, strokeColor: '#ffffff', strokeWidth: 14, shadowOn: true, shadowColor: '#000000', bgOn: false, borderOn: false, rotate: 0, vertical: false, lineHeight: 1.2 } },
+  'banner':     { label: '半透明横幅标题', style: { fontSize: 64, bold: true, color: '#ffffff', align: 'center', strokeOn: false, strokeWidth: 0, shadowOn: false, bgOn: true, bgColor: '#000000', bgAlpha: 0.5, bgRadius: 4, borderOn: false, rotate: 0, vertical: false, lineHeight: 1.25 } },
 };
 
 const COLOR_FX = {
@@ -84,6 +94,7 @@ let subtitleFrac = 0.12;
 let undoStack = [];
 
 let accordion = { template: true, title: true, steps: false, body: false, style: true, art: false };
+let tplBringText = true;   // 成图模板应用方式：true=带入模板文字，false=仅套样式与位置
 
 // ===== 入口 =====
 export function renderEditWorkbench({ frames, currentFrameId: cid, projects, results, onSwitchFrame, onSaveResult }) {
@@ -106,6 +117,7 @@ export function renderEditWorkbench({ frames, currentFrameId: cid, projects, res
       <div class="wb-main">
         <div class="wb-canvas-area" id="wb-canvas-area">
           <div class="wb-mode-badge" id="wb-mode-badge">${modeBadge()}</div>
+          <div class="wb-canvas-hint">单击选中 · 拖动移动 · 拖控制点改大小 · <strong>双击文字直接改字</strong></div>
           <div class="wb-canvas-wrap" id="wb-canvas-wrap">
             <canvas id="wb-canvas"></canvas>
             <div class="wb-handles" id="wb-handles"></div>
@@ -315,30 +327,39 @@ function renderTemplateBlock() {
     <div class="wb-prow">
       <select id="wb-tpl-select" class="wb-tpl-select">
         <option value="">— 选择成图模板 —</option>
-        ${tpls.map((t, i) => `<option value="${i}">${escapeHTML(t.name)}</option>`).join('')}
+        ${tpls.map((t, i) => `<option value="${i}">${escapeHTML(t.name)}（${(t.layers || []).length}层）</option>`).join('')}
       </select>
     </div>
+    <div class="wb-tpl-mode">
+      <div class="wb-flabel">应用方式</div>
+      <label class="wb-radio"><input type="radio" name="tplmode" value="full" ${tplBringText ? 'checked' : ''}> 带入模板文字（默认）</label>
+      <label class="wb-radio"><input type="radio" name="tplmode" value="style" ${!tplBringText ? 'checked' : ''}> 仅套用样式和位置</label>
+    </div>
     <div class="wb-prow wb-tpl-actions">
-      <button class="wb-chip" id="wb-tpl-apply">应用到当前图</button>
+      <button class="primary wb-chip" id="wb-tpl-apply">应用到当前图</button>
       <button class="wb-chip" data-apply-selected="template" title="第2步补齐">应用到选中图</button>
     </div>
     <div class="wb-prow wb-tpl-actions">
-      <button class="wb-chip" id="wb-tpl-save">保存当前为模板</button>
+      <button class="wb-chip" id="wb-tpl-save">保存当前画面为模板</button>
       <button class="wb-chip" id="wb-tpl-update">更新当前模板</button>
     </div>
-    <div class="wb-note">模板只保存版式与样式（文字框数量/位置/字号/颜色/描边/背景/边框/阴影/对齐等），不保存图片与具体文案。</div>
+    <div class="wb-note">成图模板=当前画面上的整套文字层（内容+位置+大小+样式+艺术字/旋转/竖排）。默认应用会把文字一并带入，可直接双击改字。不保存图片本身。</div>
   `;
 }
 
 function renderTitleBlock() {
   const p = project();
   return `
-    <label class="wb-flabel">关键词 / 菜名</label>
-    <div class="wb-field"><input type="text" id="wb-title-kw" placeholder="例如：饺子皮" value="${escapeAttr(p.scripts.keyword || '')}"></div>
-    <label class="wb-flabel">候选标题（点一下填入下方）</label>
+    <div class="wb-step-label">步骤 1 · 输入菜名 / 关键词</div>
+    <div class="wb-field"><input type="text" id="wb-title-kw" placeholder="例如：京酱肉丝" value="${escapeAttr(p.scripts.keyword || '')}"></div>
+    <div class="wb-hint">输入后，下方会自动生成可选标题；也可以直接手动写标题。</div>
+
+    <div class="wb-step-label">步骤 2 · 点击一个候选标题</div>
     <div class="wb-cands" id="wb-title-cands">${buildTitleCandidates(p.scripts.keyword).map(c => `<button class="wb-cand" data-title-cand="${escapeAttr(c)}">${escapeHTML(c)}</button>`).join('')}</div>
-    <label class="wb-flabel">准备加入画布的标题</label>
-    <div class="wb-field"><textarea id="wb-title-text" rows="2" placeholder="在此确认最终标题文字">${escapeHTML(p.scripts.title || '')}</textarea></div>
+    <div class="wb-hint">点击候选标题，会填入下面的标题框。</div>
+
+    <div class="wb-step-label">步骤 3 · 准备加入画布的标题</div>
+    <div class="wb-field"><textarea id="wb-title-text" rows="2" placeholder="可手动修改最终标题文字">${escapeHTML(p.scripts.title || '')}</textarea></div>
     <button class="primary wb-add" data-add="title">加入画布（标题）</button>
   `;
 }
@@ -533,6 +554,8 @@ function wrapLines(c, text, maxW) {
 
 function drawLayer(c, layer, w, h, scale) {
   if (!layer.text || !layer.text.trim()) { layer._box = null; return; }
+  if (inlineEdit.active && layer.id === inlineEdit.layerId) { return; } // 编辑中：隐藏原文字避免双层重叠
+  if (layer.vertical) return drawVerticalLayer(c, layer, w, h, scale);
   const fontSize = layer.fontSize * scale;
   const lineHeight = fontSize * (layer.lineHeight || LINE_HEIGHT_BASE);
   c.font = `${layer.bold ? 'bold ' : ''}${fontSize}px ${FONT_STACK}`;
@@ -556,14 +579,17 @@ function drawLayer(c, layer, w, h, scale) {
     return boxX;
   };
   const bx = boxX - padX, by = boxY - ascent - padY, bw = maxLineW + padX * 2, bh = visualH + padY * 2;
+
+  const rot = (layer.rotate || 0) * Math.PI / 180;
+  c.save();
+  if (rot) { const cx = bx + bw / 2, cy = by + bh / 2; c.translate(cx, cy); c.rotate(rot); c.translate(-cx, -cy); }
+
   if (layer.bgOn) {
     c.save();
     c.fillStyle = hexA(layer.bgColor, layer.bgAlpha != null ? layer.bgAlpha : 0.55);
     roundRect(c, bx, by, bw, bh, Math.min((layer.bgRadius || 0) * scale, bw / 2, bh / 2));
     c.fill();
-    if (layer.borderOn && layer.borderWidth > 0) {
-      c.lineWidth = layer.borderWidth * scale; c.strokeStyle = layer.borderColor; c.stroke();
-    }
+    if (layer.borderOn && layer.borderWidth > 0) { c.lineWidth = layer.borderWidth * scale; c.strokeStyle = layer.borderColor; c.stroke(); }
     c.restore();
   } else if (layer.borderOn && layer.borderWidth > 0) {
     c.save();
@@ -575,7 +601,7 @@ function drawLayer(c, layer, w, h, scale) {
   if (layer.shadowOn) {
     c.save();
     c.shadowColor = layer.shadowColor || '#000000';
-    c.shadowBlur = 6 * scale; c.shadowOffsetX = 2 * scale; c.shadowOffsetY = 2 * scale;
+    c.shadowBlur = 6 * scale; c.shadowOffsetX = 3 * scale; c.shadowOffsetY = 3 * scale;
     c.fillStyle = layer.color;
     lines.forEach((ln, i) => { if (ln) c.fillText(ln, lineX(i), boxY + i * lineHeight); });
     c.restore();
@@ -590,6 +616,56 @@ function drawLayer(c, layer, w, h, scale) {
   c.save();
   c.fillStyle = layer.color;
   lines.forEach((ln, i) => { if (ln) c.fillText(ln, lineX(i), boxY + i * lineHeight); });
+  c.restore();
+
+  c.restore();
+  layer._box = { x: bx, y: by, w: bw, h: bh };
+}
+
+// 竖排文字（每个 \n 行=一列，从右往左）
+function drawVerticalLayer(c, layer, w, h, scale) {
+  const fontSize = layer.fontSize * scale;
+  c.font = `${layer.bold ? 'bold ' : ''}${fontSize}px ${FONT_STACK}`;
+  c.textBaseline = 'top';
+  const cols = layer.text.split('\n');
+  const charStep = fontSize * 1.06;
+  const colStep = fontSize * (layer.lineHeight || 1.25);
+  const maxLen = Math.max(...cols.map(s => Array.from(s).length), 1);
+  const totalH = maxLen * charStep;
+  const totalW = cols.length * colStep;
+  const padX = Math.max(8 * scale, fontSize * 0.28);
+  const padY = padX;
+  const boxX = layer.xPct * w, boxY = layer.yPct * h;
+  const bx = boxX - padX, by = boxY - padY, bw = totalW + padX * 2, bh = totalH + padY * 2;
+
+  const rot = (layer.rotate || 0) * Math.PI / 180;
+  c.save();
+  if (rot) { const cx = bx + bw / 2, cy = by + bh / 2; c.translate(cx, cy); c.rotate(rot); c.translate(-cx, -cy); }
+
+  if (layer.bgOn) {
+    c.save();
+    c.fillStyle = hexA(layer.bgColor, layer.bgAlpha != null ? layer.bgAlpha : 0.55);
+    roundRect(c, bx, by, bw, bh, Math.min((layer.bgRadius || 0) * scale, bw / 2, bh / 2));
+    c.fill();
+    if (layer.borderOn && layer.borderWidth > 0) { c.lineWidth = layer.borderWidth * scale; c.strokeStyle = layer.borderColor; c.stroke(); }
+    c.restore();
+  }
+  const drawChars = (fn) => {
+    cols.forEach((seg, ci) => {
+      const x = boxX + (cols.length - 1 - ci) * colStep;
+      Array.from(seg).forEach((ch, j) => {
+        const cw = c.measureText(ch).width;
+        fn(ch, x + (fontSize - cw) / 2, boxY + j * charStep);
+      });
+    });
+  };
+  if (layer.strokeOn && layer.strokeWidth > 0) {
+    c.save(); c.lineJoin = 'round'; c.miterLimit = 2; c.lineWidth = layer.strokeWidth * scale; c.strokeStyle = layer.strokeColor;
+    drawChars((ch, x, y) => c.strokeText(ch, x, y)); c.restore();
+  }
+  c.save(); c.fillStyle = layer.color;
+  drawChars((ch, x, y) => c.fillText(ch, x, y)); c.restore();
+
   c.restore();
   layer._box = { x: bx, y: by, w: bw, h: bh };
 }
@@ -612,6 +688,7 @@ function renderHandles() {
   const wrap = document.getElementById('wb-handles');
   if (!wrap || !canvas) return;
   wrap.innerHTML = '';
+  if (inlineEdit.active) return; // 编辑中不画控制点
   const cr = canvas.getBoundingClientRect();
   const wr = wrap.getBoundingClientRect();
   const ox = cr.left - wr.left, oy = cr.top - wr.top;
@@ -1106,6 +1183,8 @@ function bindRight() {
 
 function handleRightClick(e) {
   const p = project();
+  // 模板应用方式切换
+  if (e.target.name === 'tplmode') { tplBringText = e.target.value === 'full'; return; }
   // 候选标题
   const cand = e.target.closest('[data-title-cand]');
   if (cand) { p.scripts.title = cand.dataset.titleCand; const ta = document.getElementById('wb-title-text'); if (ta) ta.value = p.scripts.title; return; }
@@ -1138,7 +1217,13 @@ function handleRightClick(e) {
 
 function handleRightInput(e) {
   const p = project();
-  if (e.target.id === 'wb-title-kw') { p.scripts.keyword = e.target.value; return; }
+  if (e.target.id === 'wb-title-kw') {
+    p.scripts.keyword = e.target.value;
+    // 候选标题随关键词实时变化（只更新候选区，不动输入框，保住焦点）
+    const cands = document.getElementById('wb-title-cands');
+    if (cands) cands.innerHTML = buildTitleCandidates(p.scripts.keyword).map(c => `<button class="wb-cand" data-title-cand="${escapeAttr(c)}">${escapeHTML(c)}</button>`).join('');
+    return;
+  }
   if (e.target.id === 'wb-title-text') { p.scripts.title = e.target.value; return; }
   if (e.target.id === 'wb-body-text') { p.scripts.body = e.target.value; return; }
   if (e.target.classList.contains('wb-step-input')) { const i = +e.target.closest('.wb-step-row').dataset.stepIdx; p.scripts.steps[i] = e.target.value; return; }
@@ -1184,6 +1269,7 @@ function defaultStyle() {
     bgOn: false, bgColor: '#000000', bgAlpha: 0.55, bgRadius: 12,
     borderOn: false, borderColor: '#000000', borderWidth: 2,
     shadowOn: false, shadowColor: '#000000',
+    rotate: 0, vertical: false,
   };
 }
 function addLayer(kind, name, text) {
@@ -1217,19 +1303,14 @@ function applyArt(id) {
 function getTemplates() { try { return JSON.parse(localStorage.getItem('editTemplates') || '[]'); } catch { return []; } }
 function setTemplates(arr) { localStorage.setItem('editTemplates', JSON.stringify(arr)); }
 function layerToTpl(l) {
-  return {
-    kind: l.kind, xPct: l.xPct, yPct: l.yPct, fontSize: l.fontSize, textWidth: l.textWidth,
-    color: l.color, bold: l.bold, align: l.align, lineHeight: l.lineHeight,
-    strokeOn: l.strokeOn, strokeColor: l.strokeColor, strokeWidth: l.strokeWidth,
-    bgOn: l.bgOn, bgColor: l.bgColor, bgAlpha: l.bgAlpha, bgRadius: l.bgRadius,
-    borderOn: l.borderOn, borderColor: l.borderColor, borderWidth: l.borderWidth,
-    shadowOn: l.shadowOn, shadowColor: l.shadowColor,
-  };
+  // 保存完整文字层（含文字内容 text、名称、旋转/竖排等），仅去掉运行时字段
+  const { _box, id, ...rest } = l;
+  return { ...rest };
 }
 function placeholderFor(kind) { return kind === 'title' ? '标题文字' : kind === 'step' ? '步骤文字' : kind === 'body' ? '正文文字' : '文字'; }
 function saveTemplatePrompt() {
   const p = project();
-  if (!p.layers.length) { showToast('当前没有文字版式可保存'); return; }
+  if (!p.layers.length) { showToast('当前画面没有文字层，无法保存模板'); return; }
   const name = prompt('成图模板名称（如：美食步骤图-黄字黑边）：');
   if (!name || !name.trim()) return;
   const tpls = getTemplates();
@@ -1237,7 +1318,7 @@ function saveTemplatePrompt() {
   setTemplates(tpls);
   p.templateName = name.trim();
   refreshTemplateBlock();
-  showToast('已保存成图模板');
+  showToast(`已保存当前画面为模板（${p.layers.length} 个文字层）`);
 }
 function updateTemplateFromSelect() {
   const sel = document.getElementById('wb-tpl-select');
@@ -1255,15 +1336,18 @@ function applyTemplateFromSelect() {
   if (!tpl) return;
   pushUndo();
   const p = project();
-  p.layers = tpl.layers.map((t, i) => ({
-    id: `L-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}`,
-    name: placeholderFor(t.kind), text: placeholderFor(t.kind), ...defaultStyle(), ...t,
-  }));
+  p.layers = tpl.layers.map((t, i) => {
+    const layer = { ...defaultStyle(), ...t, id: `L-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}` };
+    if (!tplBringText) layer.text = placeholderFor(t.kind);  // 仅套样式：用占位文字
+    else if (!layer.text) layer.text = placeholderFor(t.kind);
+    if (!layer.name) layer.name = placeholderFor(t.kind);
+    return layer;
+  });
   p.templateName = tpl.name;
   selectedLayerId = p.layers[0]?.id || null;
   markDirty();
-  refreshStyle(); drawAll(); renderHandles(); refreshQueueStatus();
-  showToast(`已应用模板：${tpl.name}（文字为占位，请逐条改文案）`);
+  refreshStyle(); focusFormatTab(); drawAll(); renderHandles(); refreshQueueStatus();
+  showToast(tplBringText ? `已应用模板：${tpl.name}，可双击画布文字直接改字` : `已套用模板样式：${tpl.name}`);
 }
 
 // ===== 队列事件 =====
@@ -1299,6 +1383,7 @@ function pushUndo() {
   if (undoStack.length > 10) undoStack.shift();
 }
 export function undoWorkbench() {
+  commitInlineEdit();
   if (undoStack.length === 0) { showToast('没有可撤销的操作'); return; }
   const snap = undoStack.pop();
   const p = project();
@@ -1316,6 +1401,7 @@ export function undoWorkbench() {
 
 // ===== 保存当前 =====
 export function saveCurrentWorkbench() {
+  commitInlineEdit();
   const frame = currentFrame(); const p = project();
   if (!frame || !p) { showToast('没有当前图'); return; }
   const img = new Image();

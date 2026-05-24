@@ -1734,7 +1734,7 @@ textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(
 
 .wb {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 520px;
+  grid-template-columns: minmax(0, 1fr) 700px;
   grid-template-rows: minmax(0, 1fr) auto;
   gap: 10px;
   height: calc(100vh - 58px - 24px);
@@ -1787,7 +1787,7 @@ textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(
 .wb-right-tabs { display: none; gap: 6px; padding: 8px 8px 0; }
 .wb-right-tabs button { flex: 1; height: 32px; font-size: 13px; font-weight: 800; }
 .wb-right-tabs button.active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
-.wb-right-dual { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; }
+.wb-right-dual { flex: 1; min-height: 0; display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 14px; padding: 10px; }
 .wb-ws { min-height: 0; overflow-y: auto; border: 1px solid rgba(200,216,248,0.6); border-radius: var(--radius-md); padding: 8px; }
 .wb-ws-title { font-size: 13px; font-weight: 800; color: var(--color-text); padding: 2px 2px 8px; border-bottom: 1px solid rgba(200,216,248,0.6); margin-bottom: 8px; }
 #wb-format { display: block; }
@@ -1853,16 +1853,35 @@ textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(
   box-shadow: 0 2px 10px rgba(20,50,140,0.25);
 }
 
-/* 窄屏：右侧双工作区退化为 Tab 切换 */
+/* 超宽屏：右侧更宽 */
+@media (min-width: 1500px) {
+  .wb { grid-template-columns: minmax(0, 1fr) 760px; }
+  .wb-right-dual { grid-template-columns: 340px minmax(0, 1fr); }
+}
+/* 1280-1500：右侧适中并排（沿用基础 700px） */
+@media (max-width: 1280px) {
+  .wb { grid-template-columns: minmax(0, 1fr) 620px; }
+  .wb-right-dual { grid-template-columns: 290px minmax(0, 1fr); gap: 10px; }
+}
+/* <1180：右侧双工作区退化为 Tab 切换 */
 @media (max-width: 1180px) {
-  .wb { grid-template-columns: minmax(0, 1fr) 340px; }
+  .wb { grid-template-columns: minmax(0, 1fr) 360px; }
   .wb-right-tabs { display: flex; }
-  .wb-right-dual { display: block; }
+  .wb-right-dual { display: block; grid-template-columns: none; }
   .wb-ws { display: none; margin-bottom: 8px; max-height: none; }
   .wb-right-dual[data-rtab="content"] .wb-ws-content { display: block; }
   .wb-right-dual[data-rtab="format"] .wb-ws-format { display: block; }
 }
 @media (max-width: 900px) {
   .wb { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto auto; }
-  .wb-right { grid-column: 1; grid-row: auto; max-height: 340px; }
+  .wb-right { grid-column: 1; grid-row: auto; max-height: 360px; }
 }
+
+/* 第1步返工2 追加：标题步骤引导 / 模板应用方式 / 画布提示 */
+.wb-step-label { font-size: 12px; font-weight: 800; color: var(--color-primary); margin: 10px 0 5px; }
+.wb-step-label:first-child { margin-top: 0; }
+.wb-hint { font-size: 11px; color: var(--color-text-muted); line-height: 1.55; margin: 4px 0 2px; }
+.wb-tpl-mode { margin: 6px 0 8px; padding: 8px; border: 1px dashed var(--color-border); border-radius: var(--radius-sm); background: #f7faff; }
+.wb-radio { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--color-text-secondary); margin-top: 4px; cursor: pointer; }
+.wb-radio input { margin: 0; }
+.wb-canvas-hint { position: absolute; top: 10px; right: 12px; z-index: 5; font-size: 11px; color: var(--color-text-secondary); background: rgba(255,255,255,0.85); padding: 3px 8px; border-radius: 999px; }
