@@ -1731,7 +1731,7 @@ textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(
 /* ===================================================================== */
 .t4-page {
   display: grid;
-  grid-template-columns: 220px 1fr 320px;
+  grid-template-columns: 190px minmax(0, 1fr) 330px;
   gap: 12px;
   align-items: start;
 }
@@ -1786,7 +1786,14 @@ textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(
 }
 .t4-back { height: 30px; padding: 0 12px; font-size: 12px; font-weight: 700; }
 .t4-tip { font-size: 12px; color: var(--color-text-muted); }
-.t4-canvas-body { padding: 10px; display: flex; justify-content: center; }
+.t4-canvas-body {
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 200px);
+  background: #f0f3fa;
+}
 .t4-canvas-wrap {
   position: relative;
   max-width: 100%;
@@ -1796,6 +1803,13 @@ textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(
 #t4-canvas { max-width: 100%; border-radius: 8px; box-shadow: var(--shadow-hover); background: #fff; }
 .t4-handles { position: absolute; inset: 0; pointer-events: none; }
 .t4-handle { position: absolute; border: 1.5px dashed var(--color-primary); border-radius: 3px; background: rgba(29,95,231,0.06); }
+.t4-resize-handle {
+  background: #fff;
+  border: 1.5px solid var(--color-primary);
+  border-radius: 3px;
+  pointer-events: all;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+}
 
 /* 右栏：操作区 */
 .t4-right-scroll {
@@ -1847,3 +1861,16 @@ textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(
 @media (max-width: 1100px) {
   .t4-page { grid-template-columns: 180px 1fr 280px; }
 }
+
+/* 第三步 v4.1 追加：候选标题 / 当前选中文字块 */
+.t4-cand-label { font-size: 11px; color: var(--color-text-muted); margin: 6px 0 4px; }
+.t4-cands { display: flex; flex-wrap: wrap; gap: 6px; }
+.t4-cand {
+  height: 28px; padding: 0 10px; font-size: 12px; font-weight: 600;
+  border-radius: 999px; background: #eef3ff; color: var(--color-text-secondary);
+  border: 1px solid #d8e2f7;
+}
+.t4-cand:hover { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+.t4-block-accent { border-color: var(--color-primary); background: rgba(29,95,231,0.04); }
+#t4-sel-text { width: 100%; resize: vertical; font-size: 14px; font-weight: 600; }
+.t4-sel-hint { font-size: 11px; color: var(--color-text-muted); margin-top: 4px; }
