@@ -1,5 +1,6 @@
 import { renderImageEditPage, initImageEditPage, PRESETS } from './pages/ImageEdit.js';
 import { renderTextOverlayPage, initTextOverlayPage } from './pages/TextOverlay.js';
+import { renderEditWorkbench, initEditWorkbench, undoWorkbench, saveCurrentWorkbench } from './pages/EditWorkbench.js';
 
 // ===== GLOBAL STATE =====
 // 数据模型说明
@@ -28,6 +29,10 @@ const state = {
   textResults: {},
   // 第三步工程：targetId -> project
   textProjects: {},
+  // ===== 成图编辑工作台（新第二步）=====
+  workbenchFrameId: null,
+  editProjects: {},   // frameId -> { baseDataUrl, layers, scripts, processed, saved, templateName }
+  editResults: {},    // frameId -> { dataUrl, savedAt } 加字/处理后的成品图
   toast: '',
   toastTimeout: null,
   regionSelecting: false,
@@ -84,6 +89,7 @@ const app = document.getElementById('app');
 function navigateTo(page, params = {}) {
   state.currentPage = page;
   if ((page === 'edit' || page === 'text') && params.imageId) state.editImageId = params.imageId;
+  if (page === 'workbench' && params.imageId) state.workbenchFrameId = params.imageId;
   window.location.hash = page;
   render();
 }
@@ -103,10 +109,11 @@ function render() {
   }
   app.innerHTML = `
     ${renderTopbar()}
-    <div class="page-content">
+    <div class="page-content ${state.currentPage === 'workbench' ? 'page-content-full' : ''}">
       ${state.currentPage === 'video' ? renderVideoPage() : ''}
       ${state.currentPage === 'edit' ? renderEditPage() : ''}
       ${state.currentPage === 'text' ? renderTextPage() : ''}
+      ${state.currentPage === 'workbench' ? renderWorkbenchPage() : ''}
     </div>
     ${state.toast ? `<div class="toast">${state.toast}</div>` : ''}
   `;
@@ -114,14 +121,14 @@ function render() {
   if (state.currentPage === 'video') bindVideoPageEvents();
   if (state.currentPage === 'edit') bindEditPageEvents();
   if (state.currentPage === 'text') bindTextPageEvents();
+  if (state.currentPage === 'workbench') bindWorkbenchPage();
 }
 
 function renderTopbar() {
   const pages = [
-    { id: 'video',  label: '视频选图', icon: '▶' },
-    { id: 'edit',   label: '图片编辑', icon: '✂' },
-    { id: 'text',   label: '文字上图', icon: 'T' },
-    { id: 'export', label: '拼图导出', icon: '▣' },
+    { id: 'video',     label: '视频选图', icon: '▶' },
+    { id: 'workbench', label: '成图编辑', icon: '✎' },
+    { id: 'export',    label: '拼图导出', icon: '▣' },
   ];
   return `
     <header class="app-topbar">
@@ -135,7 +142,10 @@ function renderTopbar() {
         `).join('')}
       </nav>
       <div class="topbar-actions">
-        <span style="font-size:12px;color:var(--color-text-muted);font-weight:700;">美食养生贴图工具 V1</span>
+        ${state.currentPage === 'workbench' ? `
+          <button id="btn-wb-undo" class="wb-top-btn">↶ 撤销</button>
+          <button id="btn-wb-save" class="primary wb-top-btn">💾 保存当前</button>
+        ` : `<span style="font-size:12px;color:var(--color-text-muted);font-weight:700;">美食养生贴图工具 V1</span>`}
       </div>
     </header>
   `;
@@ -300,7 +310,7 @@ function renderCapturedPool() {
           ${frames.map((f, idx) => renderPoolCard(f, idx)).join('')}
         </div>
         <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          <button class="primary" id="btn-open-edit" ${!state.selectedFrameId ? 'disabled' : ''} style="height:36px;padding:0 16px;font-size:13px;font-weight:800;">✂ 进入图片编辑</button>
+          <button class="primary" id="btn-open-edit" ${!state.selectedFrameId ? 'disabled' : ''} style="height:36px;padding:0 16px;font-size:13px;font-weight:800;">✎ 进入成图编辑</button>
           <button id="btn-clear-pool" ${frames.length === 0 ? 'disabled' : ''} style="height:34px;padding:0 12px;font-size:12px;font-weight:700;">清空全部</button>
         </div>
       </div>
@@ -349,6 +359,38 @@ function renderSourceTag(source) {
 // ===== EDIT PAGE =====
 function renderEditPage() {
   return renderImageEditPage(state.capturedFrames, state.editImageId, handleEditSave);
+}
+
+// ===== 成图编辑工作台（新第二步）=====
+function renderWorkbenchPage() {
+  if (state.capturedFrames.length === 0) {
+    return `
+      <div class="no-video-state">
+        <div class="nv-icon">🖼</div>
+        <div class="nv-title">还没有素材</div>
+        <div class="nv-desc">先在「视频选图」里截取或上传图片，再回来做成图编辑。</div>
+        <button class="primary" data-nav="video">前往视频选图</button>
+      </div>
+    `;
+  }
+  if (!state.capturedFrames.find(f => f.id === state.workbenchFrameId)) {
+    state.workbenchFrameId = state.capturedFrames[0].id;
+  }
+  return renderEditWorkbench({
+    frames: state.capturedFrames,
+    currentFrameId: state.workbenchFrameId,
+    projects: state.editProjects,
+    results: state.editResults,
+    onSwitchFrame: (id) => { state.workbenchFrameId = id; },
+    onSaveResult: ({ frameId, dataUrl }) => { state.editResults[frameId] = { dataUrl, savedAt: Date.now() }; },
+  });
+}
+
+function bindWorkbenchPage() {
+  if (state.capturedFrames.length === 0) return;
+  initEditWorkbench();
+  document.getElementById('btn-wb-undo')?.addEventListener('click', () => undoWorkbench());
+  document.getElementById('btn-wb-save')?.addEventListener('click', () => saveCurrentWorkbench());
 }
 
 // ===== TEXT PAGE =====
@@ -505,7 +547,7 @@ function bindVideoPageEvents() {
 
   document.getElementById('captured-pool')?.addEventListener('click', onPoolClick);
   document.getElementById('btn-open-edit')?.addEventListener('click', () => {
-    if (state.selectedFrameId) navigateTo('edit', { imageId: state.selectedFrameId });
+    if (state.selectedFrameId) navigateTo('workbench', { imageId: state.selectedFrameId });
   });
   document.getElementById('btn-clear-pool')?.addEventListener('click', clearPool);
 
@@ -941,12 +983,12 @@ function formatTime(seconds) {
 // ===== BOOT =====
 window.addEventListener('hashchange', () => {
   const page = window.location.hash.replace('#', '') || 'video';
-  if (['video', 'edit', 'text', 'export'].includes(page)) {
+  if (['video', 'edit', 'text', 'workbench', 'export'].includes(page)) {
     state.currentPage = page;
     render();
   }
 });
 
 const initPage = window.location.hash.replace('#', '') || 'video';
-state.currentPage = ['video', 'edit', 'text', 'export'].includes(initPage) ? initPage : 'video';
+state.currentPage = ['video', 'edit', 'text', 'workbench', 'export'].includes(initPage) ? initPage : 'video';
 render();
