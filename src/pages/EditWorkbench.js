@@ -45,9 +45,23 @@ const ART_PRESETS = {
   'sticky':     { label: '便签纸提示字', style: { fontSize: 42, bold: true, color: '#5b4327', align: 'center', strokeOn: false, strokeWidth: 0, shadowOn: true, shadowColor: 'rgba(0,0,0,0.2)', bgOn: true, bgColor: '#fff9c4', bgAlpha: 1, bgRadius: 4, borderOn: false, rotate: -3, vertical: false, lineHeight: 1.3, glow: false } },
   'speech':     { label: '对话框气泡字', style: { fontSize: 50, bold: true, color: '#1352d8', align: 'center', strokeOn: false, strokeWidth: 0, shadowOn: true, shadowColor: 'rgba(0,0,0,0.22)', bgOn: true, bgColor: '#ffffff', bgAlpha: 0.97, bgRadius: 26, borderOn: true, borderColor: '#1d5fe7', borderWidth: 3, rotate: 0, vertical: false, lineHeight: 1.25, glow: false } },
   'neon':       { label: '霓虹描边字', style: { fontSize: 80, bold: true, color: '#ffffff', align: 'center', strokeOn: true, strokeColor: '#00e5ff', strokeWidth: 3, shadowOn: false, bgOn: false, borderOn: false, rotate: 0, vertical: false, lineHeight: 1.2, glow: true, glowColor: '#00e5ff' } },
+  // 美食风格
+  'sign':       { label: '美食招牌字', style: { fontSize: 78, bold: true, color: '#fff3d6', align: 'center', strokeOn: true, strokeColor: '#6b2e0a', strokeWidth: 6, shadowOn: true, shadowColor: '#3a1500', bgOn: false, borderOn: false, rotate: 0, vertical: false, lineHeight: 1.15, glow: false } },
+  'handnote':   { label: '手写便签字', style: { fontSize: 44, bold: true, color: '#3a3a3a', align: 'left', strokeOn: false, strokeWidth: 0, shadowOn: false, bgOn: true, bgColor: '#fffae0', bgAlpha: 1, bgRadius: 6, borderOn: true, borderColor: '#e6d48a', borderWidth: 2, rotate: -2, vertical: false, lineHeight: 1.35, glow: false } },
+  'pop-ry':     { label: '爆款红黄描边字', style: { fontSize: 86, bold: true, color: '#fff200', align: 'center', strokeOn: true, strokeColor: '#d42a2a', strokeWidth: 12, shadowOn: true, shadowColor: '#000000', bgOn: false, borderOn: false, rotate: 0, vertical: false, lineHeight: 1.1, glow: false } },
+  'dbl-shadow': { label: '双层阴影立体字', style: { fontSize: 88, bold: true, color: '#ffffff', align: 'center', strokeOn: true, strokeColor: '#222222', strokeWidth: 5, shadowOn: true, shadowColor: '#d42a2a', bgOn: false, borderOn: false, rotate: 0, vertical: false, lineHeight: 1.15, glow: false } },
+  'circle-mark':{ label: '重点圈画字', style: { fontSize: 64, bold: true, color: '#d42a2a', align: 'center', strokeOn: false, strokeWidth: 0, shadowOn: false, bgOn: false, borderOn: true, borderColor: '#d42a2a', borderWidth: 4, bgRadius: 999, rotate: -3, vertical: false, lineHeight: 1.2, glow: false } },
+  'xhs-cover':  { label: '小红书封面字', style: { fontSize: 84, bold: true, color: '#ff2d55', align: 'center', strokeOn: true, strokeColor: '#ffffff', strokeWidth: 10, shadowOn: true, shadowColor: 'rgba(0,0,0,0.25)', bgOn: false, borderOn: false, rotate: 0, vertical: false, lineHeight: 1.15, glow: false } },
+  'recipe-step':{ label: '菜谱步骤牌', style: { fontSize: 50, bold: true, color: '#ffffff', align: 'center', strokeOn: false, strokeWidth: 0, shadowOn: false, bgOn: true, bgColor: '#2d7a4f', bgAlpha: 0.95, bgRadius: 10, borderOn: true, borderColor: '#1a5a36', borderWidth: 3, rotate: 0, vertical: false, lineHeight: 1.2, glow: false } },
+  'ancient':    { label: '养生古风标题', style: { fontSize: 56, bold: true, color: '#f5e6c8', align: 'center', strokeOn: true, strokeColor: '#5a3010', strokeWidth: 4, shadowOn: true, shadowColor: '#000000', bgOn: true, bgColor: '#3a2415', bgAlpha: 0.85, bgRadius: 8, borderOn: true, borderColor: '#a8824a', borderWidth: 2, rotate: 0, vertical: true, lineHeight: 1.25, glow: false } },
+  'fire':       { label: '辣味火焰字', style: { fontSize: 86, bold: true, color: '#ffd24d', align: 'center', strokeOn: true, strokeColor: '#b21500', strokeWidth: 7, shadowOn: false, bgOn: false, borderOn: false, rotate: 0, vertical: false, lineHeight: 1.15, glow: true, glowColor: '#ff5500' } },
+  'fresh-green':{ label: '清爽绿色标签', style: { fontSize: 46, bold: true, color: '#ffffff', align: 'center', strokeOn: false, strokeWidth: 0, shadowOn: false, bgOn: true, bgColor: '#43b049', bgAlpha: 0.95, bgRadius: 22, borderOn: false, rotate: 0, vertical: false, lineHeight: 1.2, glow: false } },
+  'cream-cute': { label: '奶油可爱字', style: { fontSize: 60, bold: true, color: '#ff8aa8', align: 'center', strokeOn: true, strokeColor: '#ffffff', strokeWidth: 8, shadowOn: true, shadowColor: 'rgba(255,138,168,0.4)', bgOn: false, borderOn: false, rotate: -2, vertical: false, lineHeight: 1.2, glow: false } },
+  'black-gold': { label: '黑金高级字', style: { fontSize: 76, bold: true, color: '#e8c878', align: 'center', strokeOn: true, strokeColor: '#3a2e10', strokeWidth: 3, shadowOn: true, shadowColor: '#000000', bgOn: true, bgColor: '#111111', bgAlpha: 0.85, bgRadius: 6, borderOn: true, borderColor: '#c9a44a', borderWidth: 2, rotate: 0, vertical: false, lineHeight: 1.2, glow: false } },
 };
 const ART_GROUP_A = ['title-yb', 'title-wb', 'hot-ry', 'tag-bw', 'tag-cream', 'slant', 'step-num', 'bubble', 'vertical', 'shadow-3d', 'double-line', 'banner'];
 const ART_GROUP_B = ['ink-brush', 'seal', 'rice-paper', 'wood', 'boom', 'cartoon-3d', 'ribbon', 'sticky', 'speech', 'neon'];
+const ART_GROUP_C = ['sign', 'handnote', 'pop-ry', 'dbl-shadow', 'circle-mark', 'xhs-cover', 'recipe-step', 'ancient', 'fire', 'fresh-green', 'cream-cute', 'black-gold'];
 
 const COLOR_FX = {
   '原图':     { brightness: 100, contrast: 100, saturate: 100, temp: 0 },
@@ -79,6 +93,7 @@ let resultsRef = {};
 let currentFrameId = null;
 let onSwitchFrameCb = null;
 let onSaveResultCb = null;
+let onDeleteFrameCb = null;
 
 let canvasMode = 'text';      // text | crop | watermark
 let activeTool = null;        // crop | watermark | color | clarity | subtitle | null
@@ -100,6 +115,7 @@ let cropDrag = { active: false, mode: null, sx: 0, sy: 0, start: null };
 let wmRect = null;            // 图片像素坐标 {x,y,w,h}
 let wmDrag = { active: false, sx: 0, sy: 0 };
 let wmFill = 'auto';          // auto | white | black
+let rotateDrag = { active: false, layerId: null, cx: 0, cy: 0, startAngle: 0, startRotate: 0 };
 
 let adj = { brightness: 100, contrast: 100, saturate: 100, temp: 0, sharpen: 0, blur: 0, shadow: 0, highlight: 0, vignette: 0 };
 let subtitleFrac = 0.12;
@@ -110,12 +126,13 @@ let accordion = { template: true, title: true, steps: false, body: false, style:
 let tplBringText = true;   // 成图模板应用方式：true=带入模板文字，false=仅套样式与位置
 
 // ===== 入口 =====
-export function renderEditWorkbench({ frames, currentFrameId: cid, projects, results, onSwitchFrame, onSaveResult }) {
+export function renderEditWorkbench({ frames, currentFrameId: cid, projects, results, onSwitchFrame, onSaveResult, onDeleteFrame }) {
   framesRef = frames || [];
   projectsRef = projects || {};
   resultsRef = results || {};
   onSwitchFrameCb = onSwitchFrame || null;
   onSaveResultCb = onSaveResult || null;
+  onDeleteFrameCb = onDeleteFrame || null;
   currentFrameId = framesRef.find(f => f.id === cid) ? cid : (framesRef[0]?.id || null);
   selectedLayerId = null;
   activeTool = null;
@@ -424,6 +441,12 @@ function renderStyleBlock() {
     <div class="wb-srow"><label>位置</label><div class="wb-btng">
       ${['top', 'center', 'bottom'].map(pp => `<button data-pos="${pp}">${pp === 'top' ? '上' : pp === 'center' ? '中' : '下'}</button>`).join('')}
     </div></div>
+    <div class="wb-srow"><label>旋转</label>
+      <input type="number" data-lp-num="rotate" value="${Math.round(l.rotate || 0)}" min="-180" max="180" step="1" style="width:60px;">
+      <span id="wb-rot-display" class="wb-rot-display">${Math.round(l.rotate || 0)}°</span>
+      <div class="wb-btng"><button data-rot="-15">⟲15</button><button data-rot="0">归零</button><button data-rot="15">⟳15</button></div>
+    </div>
+    <div class="wb-hint">提示：也可拖动画布上文字框顶部的圆形手柄自由旋转。</div>
     <div class="wb-srow wb-srow-check"><label><input type="checkbox" data-lp="bgOn" ${l.bgOn ? 'checked' : ''}> 背景板</label><input type="color" data-lp="bgColor" value="${l.bgColor}"></div>
     ${slider2('bgAlphaPct', '背景透明', 10, 100, 5, Math.round((l.bgAlpha != null ? l.bgAlpha : 0.55) * 100))}
     ${slider2('bgRadius', '圆角', 0, 40, 1, l.bgRadius)}
@@ -445,6 +468,8 @@ function renderArtBlock() {
     ${grid(ART_GROUP_A)}
     <div class="wb-art-group-label">B · 创意艺术字</div>
     ${grid(ART_GROUP_B)}
+    <div class="wb-art-group-label">C · 美食风格</div>
+    ${grid(ART_GROUP_C)}
     <div class="wb-note">点击套用到当前选中文字；未选中会提示先选文字。</div>
   `;
 }
@@ -469,6 +494,7 @@ function renderQueueCard(f, idx) {
   const name = f.materialName || ('素材' + String(idx + 1).padStart(4, '0'));
   return `
     <div class="wb-qcard ${f.id === currentFrameId ? 'active' : ''}" data-frame-id="${f.id}">
+      <button class="wb-qdel" data-frame-del="${f.id}" title="删除这张图片">×</button>
       <div class="wb-qthumb"><img src="${thumb}" draggable="false" alt="${escapeAttr(name)}"></div>
       <div class="wb-qname">${escapeHTML(name)}</div>
       <div class="wb-qbadges">
@@ -755,6 +781,16 @@ function renderHandles() {
     hd.style.cssText = `left:${ox + b.x + x}px;top:${oy + b.y + y}px;cursor:${cur};`;
     wrap.appendChild(hd);
   });
+  // 旋转手柄（位于选中框上方中点）
+  const rotX = ox + b.x + b.w / 2, rotY = oy + b.y - 26;
+  const stem = document.createElement('div');
+  stem.className = 'wb-rot-stem';
+  stem.style.cssText = `left:${rotX}px;top:${oy + b.y - 26}px;height:26px;`;
+  wrap.appendChild(stem);
+  const rot = document.createElement('div');
+  rot.className = 'wb-rot-handle'; rot.dataset.rotHandle = layer.id; rot.title = '拖动旋转';
+  rot.style.cssText = `left:${rotX - 9}px;top:${rotY - 9}px;`;
+  wrap.appendChild(rot);
 }
 
 function imgRectToView(r) { return { x: r.x * viewScale, y: r.y * viewScale, w: r.w * viewScale, h: r.h * viewScale }; }
@@ -1028,8 +1064,21 @@ function bindCanvas() {
   document.addEventListener('mousemove', onCanvasMove);
   document.addEventListener('mouseup', onCanvasUp);
 
-  // text 缩放控制点
+  // text 缩放控制点 / 旋转手柄
   wrap.addEventListener('mousedown', e => {
+    const rh = e.target.closest('.wb-rot-handle');
+    if (rh) {
+      e.preventDefault(); e.stopPropagation();
+      const layer = project().layers.find(l => l.id === rh.dataset.rotHandle);
+      if (!layer || !layer._box) return;
+      selectedLayerId = layer.id;
+      pushUndo();
+      const cr = canvas.getBoundingClientRect();
+      const cx = layer._box.x + layer._box.w / 2, cy = layer._box.y + layer._box.h / 2;
+      const px = e.clientX - cr.left, py = e.clientY - cr.top;
+      rotateDrag = { active: true, layerId: layer.id, cx, cy, startAngle: Math.atan2(py - cy, px - cx), startRotate: layer.rotate || 0 };
+      return;
+    }
     const hd = e.target.closest('.wb-rh');
     if (!hd) {
       const ch = e.target.closest('.wb-crop-handle');
@@ -1115,6 +1164,14 @@ function onCanvasMove(e) {
   if (!rect) return;
   const px = e.clientX - rect.left, py = e.clientY - rect.top;
 
+  if (rotateDrag.active) {
+    const layer = project().layers.find(l => l.id === rotateDrag.layerId); if (!layer) return;
+    const ang = Math.atan2(py - rotateDrag.cy, px - rotateDrag.cx);
+    let deg = rotateDrag.startRotate + (ang - rotateDrag.startAngle) * 180 / Math.PI;
+    deg = ((deg + 180) % 360 + 360) % 360 - 180; // 归一化到 -180~180
+    layer.rotate = Math.round(deg);
+    drawAll(); renderHandles(); syncRotateDisplay(layer); return;
+  }
   if (drag.active) {
     const layer = project().layers.find(l => l.id === drag.layerId); if (!layer) return;
     layer.xPct = (px - drag.ox) / viewW; layer.yPct = (py - drag.oy) / viewH;
@@ -1173,6 +1230,7 @@ function onCanvasMove(e) {
 function onCanvasUp() {
   if (drag.active) { drag.active = false; markDirty(); }
   if (resize.active) { resize.active = false; markDirty(); }
+  if (rotateDrag.active) { rotateDrag.active = false; markDirty(); refreshStyle(); }
   cropDrag.active = false;
   cropHandleDrag.active = false;
   if (wmDrag.active) { wmDrag.active = false; if (wmRect && (wmRect.w < 8 || wmRect.h < 8)) wmRect = null; renderHandles(); }
@@ -1180,6 +1238,12 @@ function onCanvasUp() {
 function syncFontSlider(layer) {
   const sl = document.querySelector('[data-lslider="fontSize"]');
   if (sl) { const inp = sl.querySelector('input'); const v = sl.querySelector('.wb-sval'); if (inp) inp.value = layer.fontSize; if (v) v.textContent = Math.round(layer.fontSize); }
+}
+function syncRotateDisplay(layer) {
+  const num = document.querySelector('[data-lp-num="rotate"]');
+  if (num) num.value = Math.round(layer.rotate || 0);
+  const disp = document.getElementById('wb-rot-display');
+  if (disp) disp.textContent = `${Math.round(layer.rotate || 0)}°`;
 }
 
 // ===== 右侧事件 =====
@@ -1202,7 +1266,7 @@ function bindRight() {
   right.addEventListener('input', handleRightInput);
   // 在编辑样式/文字内容前记录一次撤销点（聚焦即记录，连续微调合并为一步）
   right.addEventListener('focusin', e => {
-    if (e.target.id === 'wb-sel-text' || e.target.dataset.lp || e.target.closest('[data-lslider]')) {
+    if (e.target.id === 'wb-sel-text' || e.target.dataset.lp || e.target.dataset.lpNum || e.target.closest('[data-lslider]')) {
       if (currentLayer()) pushUndo();
     }
   });
@@ -1232,6 +1296,7 @@ function handleRightClick(e) {
   // 样式区按钮
   const al = e.target.closest('[data-align]'); if (al) { const l = currentLayer(); if (l) { pushUndo(); l.align = al.dataset.align; drawAll(); refreshStyle(); renderHandles(); markDirty(); } return; }
   const pos = e.target.closest('[data-pos]'); if (pos) { const l = currentLayer(); if (l) { pushUndo(); quickPos(l, pos.dataset.pos); drawAll(); renderHandles(); markDirty(); } return; }
+  const rb = e.target.closest('[data-rot]'); if (rb) { const l = currentLayer(); if (!l) { showToast('请先选中文字'); return; } pushUndo(); const d = +rb.dataset.rot; let nr = d === 0 ? 0 : (l.rotate || 0) + d; nr = ((nr + 180) % 360 + 360) % 360 - 180; l.rotate = nr; drawAll(); renderHandles(); syncRotateDisplay(l); markDirty(); return; }
   const sw = e.target.closest('[data-color-for]'); if (sw) { const l = currentLayer(); if (l) { pushUndo(); l[sw.dataset.colorFor] = sw.dataset.color; drawAll(); refreshStyle(); renderHandles(); markDirty(); } return; }
   if (e.target.id === 'wb-del-layer') { deleteSelectedLayer(); return; }
   const art = e.target.closest('[data-art]'); if (art) { applyArt(art.dataset.art); return; }
@@ -1258,6 +1323,16 @@ function handleRightInput(e) {
   if (e.target.id === 'wb-sel-text') {
     const l = currentLayer(); if (!l) return;
     l.text = e.target.value; drawAll(); renderHandles(); markDirty(); return;
+  }
+  // 数值型样式属性（如旋转角度）
+  const lpn = e.target.dataset.lpNum;
+  if (lpn) {
+    const l = currentLayer(); if (!l) return;
+    let v = parseFloat(e.target.value) || 0;
+    if (lpn === 'rotate') { v = Math.max(-180, Math.min(180, v)); }
+    l[lpn] = v;
+    const disp = document.getElementById('wb-rot-display'); if (disp && lpn === 'rotate') disp.textContent = `${Math.round(v)}°`;
+    drawAll(); renderHandles(); markDirty(); return;
   }
   // 样式属性
   const lp = e.target.dataset.lp;
@@ -1380,12 +1455,26 @@ function applyTemplateFromSelect() {
 // ===== 队列事件 =====
 function bindQueue() {
   document.getElementById('wb-queue')?.addEventListener('click', e => {
+    const del = e.target.closest('[data-frame-del]');
+    if (del) { e.stopPropagation(); deleteFrame(del.dataset.frameDel); return; }
     const card = e.target.closest('.wb-qcard');
     if (!card) return;
     const id = card.dataset.frameId;
     if (id === currentFrameId) return;
     switchFrame(id);
   });
+}
+function deleteFrame(id) {
+  if (!window.confirm('确定删除这张图片吗？删除后该图的文字、处理结果和保存状态也会一起删除。')) return;
+  commitInlineEdit();
+  const idx = framesRef.findIndex(f => f.id === id);
+  let newCurrent = currentFrameId;
+  if (id === currentFrameId) {
+    const next = framesRef[idx + 1] || framesRef[idx - 1];
+    newCurrent = next ? next.id : null;
+  }
+  // app 端负责从素材池移除、清理 editProjects/editResults、修正 selectedFrameId/workbenchFrameId 并整页重渲染
+  onDeleteFrameCb?.(id, newCurrent);
 }
 function switchFrame(id) {
   commitInlineEdit();

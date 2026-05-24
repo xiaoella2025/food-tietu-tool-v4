@@ -1891,3 +1891,22 @@ textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(
 /* 返工3 追加：艺术字分组标题 */
 .wb-art-group-label { font-size: 11px; font-weight: 800; color: var(--color-text-secondary); margin: 8px 0 5px; }
 .wb-art-group-label:first-child { margin-top: 0; }
+
+/* 返工4 追加：队列删除按钮 / 旋转手柄 / 旋转数值 */
+.wb-qcard { position: relative; }
+.wb-qdel {
+  position: absolute; top: 2px; right: 2px; z-index: 3;
+  width: 18px; height: 18px; padding: 0; line-height: 1;
+  font-size: 13px; font-weight: 800; border-radius: 50%;
+  background: rgba(212,42,42,0.92); color: #fff; border: none;
+  display: flex; align-items: center; justify-content: center;
+}
+.wb-qdel:hover { background: #d42a2a; box-shadow: none; }
+.wb-rot-stem { position: absolute; width: 2px; background: var(--color-primary); transform: translateX(-1px); pointer-events: none; }
+.wb-rot-handle {
+  position: absolute; width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; border: 2px solid var(--color-primary);
+  pointer-events: all; cursor: grab; box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+.wb-rot-handle:active { cursor: grabbing; }
+.wb-rot-display { font-size: 12px; font-weight: 800; color: var(--color-primary); min-width: 36px; }

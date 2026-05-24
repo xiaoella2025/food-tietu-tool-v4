@@ -383,6 +383,14 @@ function renderWorkbenchPage() {
     results: state.editResults,
     onSwitchFrame: (id) => { state.workbenchFrameId = id; },
     onSaveResult: ({ frameId, dataUrl }) => { state.editResults[frameId] = { dataUrl, savedAt: Date.now() }; },
+    onDeleteFrame: (frameId, newCurrentId) => {
+      state.capturedFrames = state.capturedFrames.filter(f => f.id !== frameId);
+      delete state.editProjects[frameId];
+      delete state.editResults[frameId];
+      if (state.selectedFrameId === frameId) state.selectedFrameId = state.capturedFrames[0]?.id || '';
+      state.workbenchFrameId = state.capturedFrames.find(f => f.id === newCurrentId) ? newCurrentId : (state.capturedFrames[0]?.id || null);
+      render();
+    },
   });
 }
 
