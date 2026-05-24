@@ -34,7 +34,20 @@ const ART_PRESETS = {
   'shadow-3d':  { label: '阴影立体字', style: { fontSize: 84, bold: true, color: '#ffffff', align: 'center', strokeOn: true, strokeColor: '#333333', strokeWidth: 4, shadowOn: true, shadowColor: '#000000', bgOn: false, borderOn: false, rotate: 0, vertical: false, lineHeight: 1.2 } },
   'double-line':{ label: '双层描边标题', style: { fontSize: 90, bold: true, color: '#ff5252', align: 'center', strokeOn: true, strokeColor: '#ffffff', strokeWidth: 14, shadowOn: true, shadowColor: '#000000', bgOn: false, borderOn: false, rotate: 0, vertical: false, lineHeight: 1.2 } },
   'banner':     { label: '半透明横幅标题', style: { fontSize: 64, bold: true, color: '#ffffff', align: 'center', strokeOn: false, strokeWidth: 0, shadowOn: false, bgOn: true, bgColor: '#000000', bgAlpha: 0.5, bgRadius: 4, borderOn: false, rotate: 0, vertical: false, lineHeight: 1.25 } },
+  // 创意艺术字（更强形态变化）
+  'ink-brush':  { label: '毛笔手写标题', style: { fontSize: 92, bold: true, color: '#1a1a1a', align: 'center', strokeOn: false, strokeWidth: 0, shadowOn: true, shadowColor: 'rgba(0,0,0,0.35)', bgOn: false, borderOn: false, rotate: -4, vertical: false, lineHeight: 1.15, glow: false } },
+  'seal':       { label: '朱红印章字', style: { fontSize: 56, bold: true, color: '#ffffff', align: 'center', strokeOn: false, strokeWidth: 0, shadowOn: false, bgOn: true, bgColor: '#c0392b', bgAlpha: 1, bgRadius: 8, borderOn: true, borderColor: '#ffffff', borderWidth: 3, rotate: -3, vertical: true, lineHeight: 1.1, glow: false } },
+  'rice-paper': { label: '宣纸国风卡片', style: { fontSize: 52, bold: true, color: '#5b4327', align: 'center', strokeOn: false, strokeWidth: 0, shadowOn: false, bgOn: true, bgColor: '#f3ead2', bgAlpha: 0.96, bgRadius: 14, borderOn: true, borderColor: '#caa46a', borderWidth: 2, rotate: 0, vertical: false, lineHeight: 1.3, glow: false } },
+  'wood':       { label: '木牌菜单字', style: { fontSize: 60, bold: true, color: '#fff3e0', align: 'center', strokeOn: false, strokeWidth: 0, shadowOn: true, shadowColor: 'rgba(0,0,0,0.4)', bgOn: true, bgColor: '#7a4a23', bgAlpha: 1, bgRadius: 12, borderOn: true, borderColor: '#4d2e15', borderWidth: 4, rotate: 0, vertical: false, lineHeight: 1.2, glow: false } },
+  'boom':       { label: '爆炸贴纸标题', style: { fontSize: 64, bold: true, color: '#d42a2a', align: 'center', strokeOn: true, strokeColor: '#000000', strokeWidth: 3, shadowOn: false, bgOn: true, bgColor: '#fff200', bgAlpha: 1, bgRadius: 4, borderOn: true, borderColor: '#000000', borderWidth: 3, rotate: -6, vertical: false, lineHeight: 1.1, glow: false } },
+  'cartoon-3d': { label: '立体卡通字', style: { fontSize: 92, bold: true, color: '#ffffff', align: 'center', strokeOn: true, strokeColor: '#1352d8', strokeWidth: 9, shadowOn: true, shadowColor: '#0a2a6b', bgOn: false, borderOn: false, rotate: 0, vertical: false, lineHeight: 1.15, glow: false } },
+  'ribbon':     { label: '丝带横幅字', style: { fontSize: 58, bold: true, color: '#ffffff', align: 'center', strokeOn: false, strokeWidth: 0, shadowOn: true, shadowColor: 'rgba(0,0,0,0.3)', bgOn: true, bgColor: '#c0392b', bgAlpha: 0.95, bgRadius: 4, borderOn: true, borderColor: '#8a2520', borderWidth: 2, rotate: 0, vertical: false, lineHeight: 1.2, glow: false } },
+  'sticky':     { label: '便签纸提示字', style: { fontSize: 42, bold: true, color: '#5b4327', align: 'center', strokeOn: false, strokeWidth: 0, shadowOn: true, shadowColor: 'rgba(0,0,0,0.2)', bgOn: true, bgColor: '#fff9c4', bgAlpha: 1, bgRadius: 4, borderOn: false, rotate: -3, vertical: false, lineHeight: 1.3, glow: false } },
+  'speech':     { label: '对话框气泡字', style: { fontSize: 50, bold: true, color: '#1352d8', align: 'center', strokeOn: false, strokeWidth: 0, shadowOn: true, shadowColor: 'rgba(0,0,0,0.22)', bgOn: true, bgColor: '#ffffff', bgAlpha: 0.97, bgRadius: 26, borderOn: true, borderColor: '#1d5fe7', borderWidth: 3, rotate: 0, vertical: false, lineHeight: 1.25, glow: false } },
+  'neon':       { label: '霓虹描边字', style: { fontSize: 80, bold: true, color: '#ffffff', align: 'center', strokeOn: true, strokeColor: '#00e5ff', strokeWidth: 3, shadowOn: false, bgOn: false, borderOn: false, rotate: 0, vertical: false, lineHeight: 1.2, glow: true, glowColor: '#00e5ff' } },
 };
+const ART_GROUP_A = ['title-yb', 'title-wb', 'hot-ry', 'tag-bw', 'tag-cream', 'slant', 'step-num', 'bubble', 'vertical', 'shadow-3d', 'double-line', 'banner'];
+const ART_GROUP_B = ['ink-brush', 'seal', 'rice-paper', 'wood', 'boom', 'cartoon-3d', 'ribbon', 'sticky', 'speech', 'neon'];
 
 const COLOR_FX = {
   '原图':     { brightness: 100, contrast: 100, saturate: 100, temp: 0 },
@@ -426,11 +439,13 @@ function slider2(id, label, min, max, step, val) {
 }
 
 function renderArtBlock() {
+  const grid = (keys) => `<div class="wb-art-grid">${keys.map(id => `<button class="wb-art" data-art="${id}">${ART_PRESETS[id].label}</button>`).join('')}</div>`;
   return `
-    <div class="wb-art-grid">
-      ${Object.entries(ART_PRESETS).map(([id, p]) => `<button class="wb-art" data-art="${id}">${p.label}</button>`).join('')}
-    </div>
-    <div class="wb-note">点击后套用到当前选中文字。</div>
+    <div class="wb-art-group-label">A · 实用排版</div>
+    ${grid(ART_GROUP_A)}
+    <div class="wb-art-group-label">B · 创意艺术字</div>
+    ${grid(ART_GROUP_B)}
+    <div class="wb-note">点击套用到当前选中文字；未选中会提示先选文字。</div>
   `;
 }
 
@@ -604,6 +619,14 @@ function drawLayer(c, layer, w, h, scale) {
     c.shadowBlur = 6 * scale; c.shadowOffsetX = 3 * scale; c.shadowOffsetY = 3 * scale;
     c.fillStyle = layer.color;
     lines.forEach((ln, i) => { if (ln) c.fillText(ln, lineX(i), boxY + i * lineHeight); });
+    c.restore();
+  }
+  if (layer.glow) {
+    c.save();
+    c.shadowColor = layer.glowColor || layer.color;
+    c.shadowBlur = 16 * scale; c.shadowOffsetX = 0; c.shadowOffsetY = 0;
+    c.fillStyle = layer.color;
+    for (let g = 0; g < 3; g++) lines.forEach((ln, i) => { if (ln) c.fillText(ln, lineX(i), boxY + i * lineHeight); });
     c.restore();
   }
   if (layer.strokeOn && layer.strokeWidth > 0) {
@@ -857,7 +880,10 @@ function applyCrop() {
   const out = document.createElement('canvas');
   out.width = Math.round(cropRect.w); out.height = Math.round(cropRect.h);
   out.getContext('2d').drawImage(baseImageEl, cropRect.x, cropRect.y, cropRect.w, cropRect.h, 0, 0, out.width, out.height);
-  setBaseDataUrl(out.toDataURL('image/png'), () => { showToast('已应用裁剪'); activeTool = null; canvasMode = 'text'; cropRect = null; refreshDock(); refreshModeBadge(); });
+  // 先退出裁剪模式并清掉裁剪框，再换底图重绘 —— 避免新尺寸下裁剪框残留/跳动
+  activeTool = null; canvasMode = 'text'; cropRect = null;
+  refreshDock(); refreshModeBadge();
+  setBaseDataUrl(out.toDataURL('image/png'), () => showToast('已应用裁剪'));
 }
 
 function applySubtitleCrop() {
@@ -866,7 +892,9 @@ function applySubtitleCrop() {
   const out = document.createElement('canvas');
   out.width = baseW; out.height = keepH;
   out.getContext('2d').drawImage(baseImageEl, 0, 0, baseW, keepH, 0, 0, baseW, keepH);
-  setBaseDataUrl(out.toDataURL('image/png'), () => { showToast('已裁掉底部字幕区'); activeTool = null; refreshDock(); });
+  activeTool = null; canvasMode = 'text';
+  refreshDock(); refreshModeBadge();
+  setBaseDataUrl(out.toDataURL('image/png'), () => showToast('已裁掉底部字幕区'));
 }
 
 function applyColorFx(name) {
@@ -1040,14 +1068,13 @@ function editLayerInline(layer) {
   const ta = document.createElement('textarea');
   ta.className = 'wb-inline-edit';
   ta.value = layer.text || '';
-  const fontPx = Math.max(12, layer.fontSize * viewScale);
-  ta.style.cssText = `left:${b.x}px;top:${b.y}px;width:${Math.max(80, b.w)}px;height:${Math.max(36, b.h)}px;`
-    + `font-size:${fontPx}px;line-height:${(layer.lineHeight || 1.32)};text-align:${layer.align || 'center'};`
-    + `color:${layer.color};font-weight:${layer.bold ? '700' : '400'};`;
+  const fontPx = Math.min(48, Math.max(15, layer.fontSize * viewScale));  // 编辑字号取易读区间，过大字号也能看清光标
+  ta.style.cssText = `left:${b.x}px;top:${b.y}px;width:${Math.max(120, b.w)}px;min-height:${Math.max(40, Math.min(b.h, 180))}px;`
+    + `font-size:${fontPx}px;line-height:1.4;text-align:${layer.align || 'center'};`;
   wrap.appendChild(ta);
   inlineEdit = { active: true, layerId: layer.id, el: ta };
   ta.focus();
-  ta.selectionStart = ta.selectionEnd = ta.value.length;
+  ta.setSelectionRange(0, ta.value.length);  // 全选，明确进入编辑态
   ta.addEventListener('input', () => {
     const l = project().layers.find(x => x.id === inlineEdit.layerId);
     if (!l) return;
@@ -1269,7 +1296,7 @@ function defaultStyle() {
     bgOn: false, bgColor: '#000000', bgAlpha: 0.55, bgRadius: 12,
     borderOn: false, borderColor: '#000000', borderWidth: 2,
     shadowOn: false, shadowColor: '#000000',
-    rotate: 0, vertical: false,
+    rotate: 0, vertical: false, glow: false, glowColor: '#00e5ff',
   };
 }
 function addLayer(kind, name, text) {
