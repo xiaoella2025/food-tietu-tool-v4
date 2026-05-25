@@ -156,6 +156,7 @@ let cellDrag = { active: false, sx: 0, sy: 0, ox0: 0, oy0: 0, maxX: 0, maxY: 0 }
 let lastCells = [];      // 最近一次绘制的格子 [{itemId,x,y,w,h,rot}]（design 坐标）
 let rightTab = 'set';    // set | text（窄屏 tab）
 let awaitingReplace = false;  // 自由图片"替换图片"待选状态
+let undoStackC = [];     // 撤销快照栈（最近10步）
 let accordion = { scheme: true, pub: true, layout: true, pin: true, canvas: false, small: false, sticker: false, export: false };
 
 let drag = { active: false, id: null, ox: 0, oy: 0 };
@@ -194,6 +195,8 @@ export function renderCollageExport({ frames, editResults, editProjects, collage
         <div class="cx-toolbar">
           <span class="cx-title">拼图导出 / 出成品图</span>
           <span style="flex:1"></span>
+          <button id="cx-undo" class="cx-tbtn" ${undoStackC.length === 0 ? 'disabled' : ''}>↶ 撤销</button>
+          <button id="cx-savescheme" class="cx-tbtn">💾 保存当前拼图</button>
           <button id="cx-copy" class="cx-tbtn">📋 复制文案</button>
           <button id="cx-export" class="cx-tbtn primary">⬇ 导出当前拼图</button>
         </div>
@@ -230,6 +233,8 @@ function sourceList() {
 }
 function srcById(id) { return sourceList().find(s => s.id === id); }
 function participants() { return C.items.filter(it => it.on).map(it => srcById(it.frameId)).filter(Boolean); }
+// 格子显示图：item.imgUrl 覆盖(替换/粘贴) 优先，否则用原素材图
+function itemDisplay(it) { if (it && it.imgUrl) return { key: 'ov-' + it.frameId, url: it.imgUrl }; const s = srcById(it.frameId); return { key: it.frameId, url: s ? s.dataUrl : null }; }
 
 function applyRatio(r) {
   let rw = 1, rh = 1;
@@ -296,6 +301,7 @@ function renderRight() {
             <button class="cx-add" data-addtext="body">+ 说明</button>
             <button class="cx-add" data-addtext="tag">+ 标签</button>
           </div>
+          ${renderStep2Body()}
           <div id="cx-textstyle">${renderTextStyle()}</div>
         </div>
       </div>
@@ -378,6 +384,31 @@ function renderSchemeBlock() {
     </div>
     <div class="cx-note">「保存当前拼图」=可回来继续编辑；「导出」=生成最终文件，两者不同。</div>
   `;
+}
+// 汇总第二步(成图编辑)各参与图的正文
+function collectStep2Body() {
+  const out = [];
+  C.items.filter(it => it.on).forEach(it => {
+    const p = editProjectsRef[it.frameId];
+    const body = p && p.scripts && (p.scripts.body || '').trim();
+    if (body) { const s = srcById(it.frameId); out.push({ name: s ? s.name : it.frameId, body }); }
+  });
+  return out;
+}
+function renderStep2Body() {
+  const list = collectStep2Body();
+  if (!list.length) return `<div class="cx-block-desc" style="margin-bottom:8px">来自成图编辑的正文：暂无。在第二步「成图编辑」写了正文并保存后，会显示在这里，可一键导入/复制。</div>`;
+  return `
+    <div class="cx-acc open" data-acc="step2body" style="margin-bottom:8px">
+      <div class="cx-acc-head"><span>来自成图编辑的正文（${list.length}）</span><span></span></div>
+      <div class="cx-acc-body">
+        <div class="cx-step2-list">${list.map(x => `<div class="cx-step2-item"><b>${escapeHTML(x.name)}</b>：${escapeHTML(x.body.slice(0, 40))}${x.body.length > 40 ? '…' : ''}</div>`).join('')}</div>
+        <div class="cx-addrow">
+          <button class="cx-add" id="cx-import-body">导入到说明文字</button>
+          <button class="cx-add" id="cx-copy-body">复制这些正文</button>
+        </div>
+      </div>
+    </div>`;
 }
 function renderTextStyle() {
   const l = curLayer();
@@ -476,7 +507,10 @@ export function initCollageExport() {
 
 function loadImages(cb) {
   const jobs = [];
-  participants().forEach(s => { if (!imgCache[s.id]) jobs.push({ key: s.id, url: s.dataUrl }); });
+  // 参与图（含格子覆盖图）
+  C.items.filter(it => it.on).forEach(it => { const d = itemDisplay(it); if (d.url && !imgCache[d.key]) jobs.push({ key: d.key, url: d.url }); });
+  // 自由图片层
+  (C.layers || []).forEach(l => { if (l.kind === 'image') { const s = srcById(l.frameId); if (s && !imgCache[l.frameId]) jobs.push({ key: l.frameId, url: s.dataUrl }); } });
   (C.layers || []).forEach(l => { if (l.kind === 'sticker' && l.stype === 'img' && l.dataUrl && !imgCache[l.id]) jobs.push({ key: l.id, url: l.dataUrl }); });
   let pending = jobs.length;
   if (pending === 0) { cb?.(); return; }
@@ -517,6 +551,11 @@ function drawDesign(c) {
   lastCells = [];
   if (C.settings.pinstyle === 'free') {
     drawFrame(c, C.settings.frame);
+    if (!(C.layers || []).length) {
+      c.fillStyle = '#8096b8'; c.font = `${Math.round(designW * 0.032)}px ${FONT_STACK}`; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText('请从底部选择图片添加到画布', designW / 2, designH / 2);
+      c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+    }
     // 按数组顺序绘制所有层（图片/文字/贴图统一受图层顺序控制）
     (C.layers || []).forEach(l => drawLayer(c, l));
   } else {
@@ -577,7 +616,7 @@ function drawCells(c, x0, y0, w, h) {
 function drawCell(c, src, x, y, w, h, rot) {
   const sm = C.settings.small;
   const it = itemById(src.id) || {};
-  const img = imgCache[src.id];
+  const img = imgCache[itemDisplay(it).key];
   const sel = src.id === cellSel;
   c.save();
   if (rot) { const ccx = x + w / 2, ccy = y + h / 2; c.translate(ccx, ccy); c.rotate(rot * Math.PI / 180); c.translate(-ccx, -ccy); }
@@ -784,6 +823,8 @@ function onResize() { sizeCanvas(); redraw(); }
 function bindTop() {
   document.getElementById('cx-copy')?.addEventListener('click', copyCopy);
   document.getElementById('cx-export')?.addEventListener('click', () => exportCurrent());
+  document.getElementById('cx-undo')?.addEventListener('click', undoCollageExport);
+  document.getElementById('cx-savescheme')?.addEventListener('click', schemeSave);
 }
 
 function bindCanvas() {
@@ -799,6 +840,7 @@ function bindCanvas() {
     for (let i = layers.length - 1; i >= 0; i--) { const l = layers[i]; if (l.kind === 'image' && !isFree()) continue; const b = l._box; if (b && px >= b.x - 6 && px <= b.x + b.w + 6 && py >= b.y - 6 && py <= b.y + b.h + 6) { hit = l; break; } }
     if (hit) {
       const changed = selectedLayerId !== hit.id; selectedLayerId = hit.id; cellSel = null;
+      pushUndoC();
       drag = { active: true, id: hit.id, ox: px - hit.xPct * designW, oy: py - hit.yPct * designH };
       if (changed) refreshTextStyle();
       redraw(); e.preventDefault(); return;
@@ -809,6 +851,7 @@ function bindCanvas() {
       if (cell) {
         cellSel = cell.itemId; selectedLayerId = null;
         const it = itemById(cell.itemId) || {};
+        pushUndoC();
         cellDrag = { active: true, id: cell.itemId, sx: px, sy: py, ox0: it.offX || 0, oy0: it.offY || 0, cw: cell.w, ch: cell.h };
         refreshTextStyle(); refreshPinZoom(); redraw(); e.preventDefault(); return;
       }
@@ -828,12 +871,12 @@ function bindCanvas() {
     const db = e.target.closest('.cx-delbtn');
     if (db) { e.preventDefault(); e.stopPropagation(); delLayer(); return; }
     const rot = e.target.closest('.cx-rot');
-    if (rot) { const l = curLayer(); if (!l || !l._box) return; e.preventDefault(); e.stopPropagation();
+    if (rot) { const l = curLayer(); if (!l || !l._box) return; e.preventDefault(); e.stopPropagation(); pushUndoC();
       const r = canvas.getBoundingClientRect(); const ccx = (l._box.x + l._box.w / 2), ccy = (l._box.y + l._box.h / 2);
       const px = (e.clientX - r.left) / sPrev, py = (e.clientY - r.top) / sPrev;
       rotateDrag = { active: true, id: l.id, cx: ccx, cy: ccy, a0: Math.atan2(py - ccy, px - ccx), r0: l.rotate || 0 }; return; }
     const hd = e.target.closest('.cx-rh');
-    if (hd) { const l = curLayer(); if (!l || !l._box) return; e.preventDefault(); e.stopPropagation();
+    if (hd) { const l = curLayer(); if (!l || !l._box) return; e.preventDefault(); e.stopPropagation(); pushUndoC();
       resize = { active: true, id: l.id, handle: hd.dataset.rh, sx: e.clientX, sy: e.clientY, startFont: l.fontSize || 0, startW: l.textWidth || designW * 0.9, startBoxW: l._box.w, startBoxH: l._box.h, startSize: l.size || 0, startScale: l.scale || 1 }; }
   });
   canvas.addEventListener('dblclick', e => {
@@ -902,8 +945,8 @@ function handleRightClick(e) {
   const t = e.target;
   const pub = t.closest('[data-pub]'); if (pub) { C.settings.ratio = pub.dataset.pub; applyRatio(C.settings.ratio); refreshRight(); sizeCanvas(); redraw(); return; }
   const ra = t.closest('[data-ratio]'); if (ra) { C.settings.ratio = ra.dataset.ratio; applyRatio(C.settings.ratio); refreshRight(); sizeCanvas(); redraw(); return; }
-  const la = t.closest('[data-layout]'); if (la) { const L = LAYOUTS.find(x => x.id === la.dataset.layout); C.settings.layout = L.id; C.settings.cols = L.cols; C.settings.pinstyle = 'grid'; refreshRight(); redraw(); return; }
-  const pin = t.closest('[data-pin]'); if (pin) { C.settings.pinstyle = pin.dataset.pin; cellSel = null; if (C.settings.pinstyle === 'free') ensureFreeImages(); refreshRight(); loadImages(() => redraw()); return; }
+  const la = t.closest('[data-layout]'); if (la) { pushUndoC(); const L = LAYOUTS.find(x => x.id === la.dataset.layout); C.settings.layout = L.id; C.settings.cols = L.cols; C.settings.pinstyle = 'grid'; C.items.forEach(it => { if (!it.on) it.on = true; }); refreshRight(); loadImages(() => redraw()); return; }
+  const pin = t.closest('[data-pin]'); if (pin) { pushUndoC(); C.settings.pinstyle = pin.dataset.pin; cellSel = null; if (C.settings.pinstyle !== 'free') C.items.forEach(it => { if (!it.on) it.on = true; }); if (C.settings.pinstyle === 'free') ensureFreeImages(); refreshRight(); loadImages(() => redraw()); return; }
   if (t.id === 'cx-free-reset') { resetFreeImages(); loadImages(() => redraw()); return; }
   const bg = t.closest('[data-bg]'); if (bg) { const b = BG_PRESETS.find(x => x.id === bg.dataset.bg); C.settings.bg = { ...b }; refreshRight(); redraw(); return; }
   const fr = t.closest('[data-frame]'); if (fr) { C.settings.frame = fr.dataset.frame; refreshRight(); redraw(); return; }
@@ -921,9 +964,11 @@ function handleRightClick(e) {
   // 图层顺序
   const ord = t.closest('[data-order]'); if (ord) { reorderLayer(ord.dataset.order); return; }
   // 自由图片取景/替换
-  const nd = t.closest('[data-nudge]'); if (nd) { const l = curLayer(); if (l && l.kind === 'image') { const k = nd.dataset.nudge; if (k === 'zin') l.innerScale = Math.min(2.8, (l.innerScale || 1) + 0.1); else if (k === 'zout') l.innerScale = Math.max(1, (l.innerScale || 1) - 0.1); else if (k === 'up') l.innerOffY = Math.max(-1, (l.innerOffY || 0) - 0.1); else if (k === 'down') l.innerOffY = Math.min(1, (l.innerOffY || 0) + 0.1); else if (k === 'left') l.innerOffX = Math.max(-1, (l.innerOffX || 0) - 0.1); else if (k === 'right') l.innerOffX = Math.min(1, (l.innerOffX || 0) + 0.1); redraw(); refreshTextStyle(); } return; }
+  const nd = t.closest('[data-nudge]'); if (nd) { const l = curLayer(); if (l && l.kind === 'image') { pushUndoC(); const k = nd.dataset.nudge; if (k === 'zin') l.innerScale = Math.min(2.8, (l.innerScale || 1) + 0.1); else if (k === 'zout') l.innerScale = Math.max(1, (l.innerScale || 1) - 0.1); else if (k === 'up') l.innerOffY = Math.max(-1, (l.innerOffY || 0) - 0.1); else if (k === 'down') l.innerOffY = Math.min(1, (l.innerOffY || 0) + 0.1); else if (k === 'left') l.innerOffX = Math.max(-1, (l.innerOffX || 0) - 0.1); else if (k === 'right') l.innerOffX = Math.min(1, (l.innerOffX || 0) + 0.1); redraw(); refreshTextStyle(); } return; }
   if (t.id === 'cx-img-resetview') { const l = curLayer(); if (l) { l.innerScale = 1; l.innerOffX = 0; l.innerOffY = 0; redraw(); refreshTextStyle(); } return; }
   if (t.id === 'cx-img-replace') { awaitingReplace = !awaitingReplace; refreshTextStyle(); if (awaitingReplace) toast('请点击底部素材，替换当前选中图片'); return; }
+  if (t.id === 'cx-import-body') { const list = collectStep2Body(); if (!list.length) { toast('暂无第二步正文'); return; } const text = list.map(x => x.body).join('\n'); pushUndoC(); C.layers = C.layers || []; const l = { id: 'T-' + Date.now() + Math.random().toString(36).slice(2, 5), kind: 'text', ...defaultText(), text, fontSize: 38, strokeOn: false, bgOn: true, xPct: 0.1, yPct: 0.8 }; C.layers.push(l); selectedLayerId = l.id; refreshTextStyle(); redraw(); toast('已把第二步正文导入为说明文字'); return; }
+  if (t.id === 'cx-copy-body') { const list = collectStep2Body(); const text = list.map(x => x.body).join('\n'); if (!text) { toast('暂无第二步正文'); return; } if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => toast('已复制第二步正文')).catch(() => fallbackCopy(text)); else fallbackCopy(text); return; }
   const at = t.closest('[data-addtext]'); if (at) { addText(at.dataset.addtext); return; }
   const al = t.closest('[data-align]'); if (al) { const l = curLayer(); if (l) { l.align = al.dataset.align; redraw(); refreshTextStyle(); } return; }
   const sw = t.closest('[data-colorfor]'); if (sw) { const l = curLayer(); if (l) { l[sw.dataset.colorfor] = sw.dataset.color; redraw(); refreshTextStyle(); } return; }
@@ -995,15 +1040,21 @@ function addFreeImageFromSource(frameId) {
   toast('已添加到画布（自由摆放）');
 }
 function replaceSelectedImage(frameId) {
+  pushUndoC();
   const l = curLayer();
-  if (!l || l.kind !== 'image') { toast('请先在画布上选中一张图片，再点"替换选中图"'); return; }
-  l.frameId = frameId; l.innerScale = 1; l.innerOffX = 0; l.innerOffY = 0; // 保留框位置/大小/旋转/层级，取景重置适配新图
-  awaitingReplace = false;
-  loadImages(() => { redraw(); refreshTextStyle(); });
-  toast('已替换选中图片');
+  if (l && l.kind === 'image') { // 自由图片层替换
+    l.frameId = frameId; l.innerScale = 1; l.innerOffX = 0; l.innerOffY = 0;
+    awaitingReplace = false; loadImages(() => { redraw(); refreshTextStyle(); }); toast('已替换选中图片'); return;
+  }
+  if (cellSel) { // 规则/不规则格子替换：用该源图覆盖格子，重置取景
+    const it = itemById(cellSel); const s = srcById(frameId);
+    if (it && s) { delete imgCache['ov-' + it.frameId]; it.imgUrl = s.dataUrl; it.offX = 0; it.offY = 0; it.scale = 1; loadImages(() => { redraw(); refreshPinZoom(); }); toast('已替换当前格子图片'); }
+    return;
+  }
+  toast('请先在画布上选中一张图片或一个拼图格子，再点"替换选中图"');
 }
-function moveItem(id, dir) { const i = C.items.findIndex(x => x.frameId === id); const j = i + dir; if (i < 0 || j < 0 || j >= C.items.length) return; [C.items[i], C.items[j]] = [C.items[j], C.items[i]]; refreshQueue(); redraw(); }
-function reorder(srcId, tgtId) { if (!srcId || srcId === tgtId) return; const from = C.items.findIndex(x => x.frameId === srcId); const to = C.items.findIndex(x => x.frameId === tgtId); if (from < 0 || to < 0) return; const [m] = C.items.splice(from, 1); C.items.splice(to, 0, m); refreshQueue(); redraw(); }
+function moveItem(id, dir) { const i = C.items.findIndex(x => x.frameId === id); const j = i + dir; if (i < 0 || j < 0 || j >= C.items.length) return; pushUndoC(); [C.items[i], C.items[j]] = [C.items[j], C.items[i]]; refreshQueue(); redraw(); }
+function reorder(srcId, tgtId) { if (!srcId || srcId === tgtId) return; pushUndoC(); const from = C.items.findIndex(x => x.frameId === srcId); const to = C.items.findIndex(x => x.frameId === tgtId); if (from < 0 || to < 0) return; const [m] = C.items.splice(from, 1); C.items.splice(to, 0, m); refreshQueue(); redraw(); }
 
 // ===== 图层操作 =====
 function defaultText() {
@@ -1031,6 +1082,7 @@ function normalizeLayer(l) {
   return l;
 }
 function addText(kind) {
+  pushUndoC();
   C.layers = C.layers || [];
   const map = { title: { text: '总标题', fontSize: 84 }, subtitle: { text: '副标题', fontSize: 52 }, body: { text: '说明文字', fontSize: 38, strokeOn: false, bgOn: true }, tag: { text: '标签', fontSize: 40, bgOn: true, bgColor: '#d42a2a', color: '#fff200', strokeOn: false } };
   const yPos = { title: 0.08, subtitle: 0.2, body: 0.85, tag: 0.04 };
@@ -1038,18 +1090,18 @@ function addText(kind) {
   C.layers.push(l); selectedLayerId = l.id; refreshTextStyle(); redraw();
 }
 function addSticker(i) {
-  const s = STICKERS[i]; if (!s) return; C.layers = C.layers || [];
+  const s = STICKERS[i]; if (!s) return; pushUndoC(); C.layers = C.layers || [];
   const l = { id: 'S-' + Date.now() + Math.random().toString(36).slice(2, 5), kind: 'sticker', stype: s.stype, glyph: s.glyph, text: s.text, bg: s.bg, color: s.color, size: 140, xPct: 0.5, yPct: 0.5, rotate: 0 };
   C.layers.push(l); selectedLayerId = l.id; redraw(); renderHandles();
 }
 function addImageSticker(dataUrl) {
+  pushUndoC();
   C.layers = C.layers || [];
   const l = { id: 'S-' + Date.now() + Math.random().toString(36).slice(2, 5), kind: 'sticker', stype: 'img', dataUrl, size: designW * 0.3, xPct: 0.5, yPct: 0.5, rotate: 0 };
   C.layers.push(l); selectedLayerId = l.id;
   loadImages(() => { redraw(); renderHandles(); });
-  toast('已加入贴图');
 }
-function delLayer() { const i = (C.layers || []).findIndex(l => l.id === selectedLayerId); if (i < 0) return; C.layers.splice(i, 1); selectedLayerId = null; refreshTextStyle(); redraw(); }
+function delLayer() { const i = (C.layers || []).findIndex(l => l.id === selectedLayerId); if (i < 0) return; pushUndoC(); C.layers.splice(i, 1); selectedLayerId = null; refreshTextStyle(); redraw(); }
 
 // ===== 自由摆放：用图片图层承载 =====
 function ensureFreeImages() {
@@ -1082,14 +1134,42 @@ function getPresets() { try { return JSON.parse(localStorage.getItem('cxPresets'
 function setPresets(a) { return safeSet('cxPresets', a); }
 // 工程快照：只存结构 + frameId（不重复存参与图片 dataUrl）；贴图上传图保留 dataUrl
 function snapshot() { return JSON.parse(JSON.stringify({ items: C.items, layers: (C.layers || []).map(l => { const { _box, ...r } = l; return r; }), settings: C.settings })); }
+// ===== 撤销 =====
+function pushUndoC() { undoStackC.push(snapshot()); if (undoStackC.length > 10) undoStackC.shift(); refreshUndoBtn(); }
+function refreshUndoBtn() { const b = document.getElementById('cx-undo'); if (b) b.disabled = undoStackC.length === 0; }
+export function undoCollageExport() {
+  if (undoStackC.length === 0) { toast('没有可撤销的操作'); return; }
+  const snap = undoStackC.pop();
+  loadSnapshot(snap); selectedLayerId = null; cellSel = null; awaitingReplace = false;
+  applyRatio(C.settings.ratio); imgCache = {};
+  if (C.settings.pinstyle === 'free') ensureFreeImages();
+  refreshRight(); refreshQueue(); loadImages(() => { sizeCanvas(); redraw(); }); refreshUndoBtn();
+  toast('已撤销');
+}
 function loadSnapshot(s) { C.items = JSON.parse(JSON.stringify(s.items || [])); C.layers = (JSON.parse(JSON.stringify(s.layers || []))).map(normalizeLayer); C.settings = Object.assign(defaultSettings(), JSON.parse(JSON.stringify(s.settings || {}))); if (!C.settings.small) C.settings.small = defaultSettings().small; }
 function schemeSave() { const sel = document.getElementById('cx-scheme-sel'); const a = getSchemes(); if (sel && sel.value !== '') { a[+sel.value].snap = snapshot(); if (setSchemes(a)) toast('已保存当前拼图'); } else { const name = prompt('拼图工程名称：', '拼图' + (a.length + 1)); if (!name) return; a.push({ name: name.trim(), snap: snapshot() }); if (setSchemes(a)) { toast('已保存当前拼图'); refreshRight(); } } }
 function schemeCopyCurrent() { const a = getSchemes(); const name = prompt('复制为新拼图，名称：', '拼图副本'); if (!name) return; a.push({ name: name.trim(), snap: snapshot() }); if (setSchemes(a)) { toast('已复制为新拼图工程'); refreshRight(); } }
 function schemeDel() { const sel = document.getElementById('cx-scheme-sel'); const a = getSchemes(); if (!sel || sel.value === '') { toast('请先在下拉里选择要删除的拼图工程'); return; } if (!window.confirm('删除该拼图工程？（不影响底部素材）')) return; a.splice(+sel.value, 1); setSchemes(a); toast('已删除'); refreshRight(); }
 function schemeLoad(i) { const a = getSchemes(); if (!a[i]) return; loadSnapshot(a[i].snap); selectedLayerId = null; cellSel = null; awaitingReplace = false; applyRatio(C.settings.ratio); imgCache = {}; if (C.settings.pinstyle === 'free') ensureFreeImages(); refreshRight(); refreshQueue(); loadImages(() => { sizeCanvas(); redraw(); }); toast(`已载入：${a[i].name}`); }
-function newBlank() { if (!window.confirm('新建空白拼图？将清空当前画布的文字/贴图/自由图层（不删除底部素材）。')) return; C.layers = []; C.items.forEach(it => { delete it.offX; delete it.offY; delete it.scale; }); selectedLayerId = null; cellSel = null; awaitingReplace = false; refreshRight(); refreshQueue(); loadImages(() => redraw()); toast('已新建空白拼图'); }
-function clearCanvas() { if (!window.confirm('清空当前画布上的文字/贴图/自由图层？（保留底部素材与设置）')) return; C.layers = []; selectedLayerId = null; cellSel = null; awaitingReplace = false; if (C.settings.pinstyle === 'free') ensureFreeImages(); refreshRight(); loadImages(() => redraw()); toast('已清空画布'); }
-function reorderLayer(dir) { const i = (C.layers || []).findIndex(l => l.id === selectedLayerId); if (i < 0) return; const a = C.layers; if (dir === 'up' && i < a.length - 1) { [a[i], a[i + 1]] = [a[i + 1], a[i]]; } else if (dir === 'down' && i > 0) { [a[i], a[i - 1]] = [a[i - 1], a[i]]; } else if (dir === 'top') { a.push(a.splice(i, 1)[0]); } else if (dir === 'bottom') { a.unshift(a.splice(i, 1)[0]); } redraw(); }
+function clearItemsState() { C.items.forEach(it => { it.on = false; delete it.offX; delete it.offY; delete it.scale; delete it.imgUrl; }); }
+function newBlank() {
+  if (!window.confirm('新建空白拼图？将清空画布内容与参与图片选择（不删除底部素材库）。')) return;
+  pushUndoC();
+  C.layers = []; clearItemsState();
+  C.settings.pinstyle = 'free';           // 空白未选择：自由摆放、无图
+  selectedLayerId = null; cellSel = null; awaitingReplace = false;
+  refreshRight(); refreshQueue(); loadImages(() => { sizeCanvas(); redraw(); });
+  toast('已新建空白拼图，请从底部选择图片添加到画布');
+}
+function clearCanvas() {
+  if (!window.confirm('清空当前画布？将清掉文字/贴图/自由图层与拼图格子里的图片（保留底部素材与比例/背景/边框）。')) return;
+  pushUndoC();
+  C.layers = []; clearItemsState();
+  selectedLayerId = null; cellSel = null; awaitingReplace = false;
+  refreshRight(); refreshQueue(); loadImages(() => { sizeCanvas(); redraw(); });
+  toast('已清空画布');
+}
+function reorderLayer(dir) { const i = (C.layers || []).findIndex(l => l.id === selectedLayerId); if (i < 0) return; pushUndoC(); const a = C.layers; if (dir === 'up' && i < a.length - 1) { [a[i], a[i + 1]] = [a[i + 1], a[i]]; } else if (dir === 'down' && i > 0) { [a[i], a[i - 1]] = [a[i - 1], a[i]]; } else if (dir === 'top') { a.push(a.splice(i, 1)[0]); } else if (dir === 'bottom') { a.unshift(a.splice(i, 1)[0]); } redraw(); }
 function presetSnapshot() { const s = JSON.parse(JSON.stringify(C.settings)); const layers = (C.layers || []).filter(l => l.kind !== 'image').map(l => { const { _box, dataUrl, ...r } = l; return r; }); return { settings: s, layers }; }
 function presetSave() { const name = prompt('版式模板名称：'); if (!name) return; const a = getPresets(); a.push({ name: name.trim(), ...presetSnapshot() }); if (setPresets(a)) { toast('已保存版式模板（不含图片）'); refreshRight(); } }
 function presetUpdate() { const sel = document.getElementById('cx-preset-sel'); const a = getPresets(); if (!sel || sel.value === '') { toast('请先选择要更新的版式模板'); return; } const ps = presetSnapshot(); a[+sel.value].settings = ps.settings; a[+sel.value].layers = ps.layers; if (setPresets(a)) toast('已更新模板'); }
@@ -1116,13 +1196,29 @@ function handleUpload(e) {
   e.target.value = '';
 }
 function handlePaste(e) {
+  if (!document.getElementById('cx-canvas')) return; // 非本页
   const items = (e.clipboardData || {}).items; if (!items) return;
-  for (const it of items) { if (it.type && it.type.indexOf('image') === 0) { const f = it.getAsFile(); if (f) { const rd = new FileReader(); rd.onload = ev => addImageSticker(ev.target.result); rd.readAsDataURL(f); e.preventDefault(); break; } } }
+  for (const it of items) {
+    if (it.type && it.type.indexOf('image') === 0) {
+      const f = it.getAsFile(); if (!f) continue;
+      const rd = new FileReader();
+      rd.onload = ev => {
+        const url = ev.target.result;
+        if (C.settings.pinstyle !== 'free' && cellSel) {
+          pushUndoC(); const item = itemById(cellSel); if (item) { delete imgCache['ov-' + item.frameId]; item.imgUrl = url; item.offX = 0; item.offY = 0; item.scale = 1; loadImages(() => { redraw(); refreshPinZoom(); }); toast('已替换当前图片'); }
+        } else {
+          addImageSticker(url); toast('已作为图片贴层加入画布');
+        }
+      };
+      rd.readAsDataURL(f); e.preventDefault(); break;
+    }
+  }
 }
 function onKeyDown(e) {
   if (!document.getElementById('cx-canvas')) return; // 非本页
   const tag = (document.activeElement && document.activeElement.tagName) || '';
   if (tag === 'INPUT' || tag === 'TEXTAREA' || inlineEdit.active) return;
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); undoCollageExport(); return; }
   if ((e.key === 'Delete' || e.key === 'Backspace') && selectedLayerId) { e.preventDefault(); delLayer(); }
 }
 

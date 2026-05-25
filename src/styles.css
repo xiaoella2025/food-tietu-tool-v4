@@ -2015,3 +2015,8 @@ textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(
 .cx-qadd { color: var(--color-primary); border-color: var(--color-primary); }
 .cx-qrep.dim { opacity: 0.5; }
 .cx-inline { box-sizing: border-box; min-height: 2.2em; line-height: 1.4; }
+
+/* 拼图导出返工5：第二步正文列表 */
+.cx-step2-list { max-height: 120px; overflow-y: auto; margin-bottom: 6px; }
+.cx-step2-item { font-size: 11px; line-height: 1.5; color: var(--color-text-secondary); padding: 3px 0; border-bottom: 1px dashed #e0e8f8; }
+.cx-step2-item b { color: var(--color-text); }

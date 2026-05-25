@@ -1516,10 +1516,11 @@ export function undoWorkbench() {
 }
 
 // ===== 保存当前 =====
-export function saveCurrentWorkbench() {
+// 合成当前图(底图+文字层)为 dataUrl，回调 cb(dataUrl)
+function composeCurrent(cb) {
   commitInlineEdit();
   const frame = currentFrame(); const p = project();
-  if (!frame || !p) { showToast('没有当前图'); return; }
+  if (!frame || !p) { showToast('没有当前图'); cb && cb(null); return; }
   const img = new Image();
   img.onload = () => {
     const W = img.naturalWidth, H = img.naturalHeight;
@@ -1528,14 +1529,29 @@ export function saveCurrentWorkbench() {
     const oc = out.getContext('2d');
     oc.drawImage(img, 0, 0, W, H);
     p.layers.forEach(l => drawLayer(oc, l, W, H, 1));
-    const dataUrl = out.toDataURL('image/png');
+    cb && cb(out.toDataURL('image/png'), frame, p);
+  };
+  img.onerror = () => { showToast('底图加载失败'); cb && cb(null); };
+  img.src = p.baseDataUrl || frame.sourceDataUrl;
+}
+export function saveCurrentWorkbench() {
+  composeCurrent((dataUrl, frame, p) => {
+    if (!dataUrl) return;
     onSaveResultCb?.({ frameId: frame.id, dataUrl });
     p.saved = true;
     refreshQueue();
     showToast('已保存当前成图');
-  };
-  img.onerror = () => showToast('底图加载失败，保存中断');
-  img.src = p.baseDataUrl || frame.sourceDataUrl;
+  });
+}
+// 导出当前单图（PNG）；未保存则自动用当前状态合成
+export function exportCurrentWorkbenchImage() {
+  composeCurrent((dataUrl, frame) => {
+    if (!dataUrl) return;
+    const a = document.createElement('a');
+    a.href = dataUrl; a.download = `成图_${(frame && frame.materialName) || Date.now()}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
+    showToast('已导出当前单图');
+  });
 }
 
 // ===== 候选标题（本地）=====
