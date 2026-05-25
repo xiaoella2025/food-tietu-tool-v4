@@ -294,10 +294,10 @@ function renderRight() {
           ${sec('layout', '③ 拼图布局', renderLayout())}
           ${sec('pin', '④ 拼图样式', renderPinStyle())}
           ${sec('canvas', '⑤ 画布与边框', renderCanvasBlock())}
-          ${bgLayer() ? sec('bgimg', '⑥ 背景图设置', renderBgPanel()) : ''}
-          ${sec('small', '⑦ 小图样式', renderSmall())}
-          ${sec('sticker', '⑧ 贴图素材', renderStickerBlock())}
-          ${sec('export', '⑨ 导出设置', renderExportBlock())}
+          ${bgLayer() ? sec('bgimg', '⑤·背景图（粘贴/置为背景）', renderBgPanel()) : ''}
+          ${sec('small', '⑥ 小图样式', renderSmall())}
+          ${sec('sticker', '⑦ 贴图素材', renderStickerBlock())}
+          ${sec('export', '⑧ 导出设置', renderExportBlock())}
         </div>
         <div class="cx-ws cx-ws-text">
           <div class="cx-ws-title">成品文字</div>
@@ -462,13 +462,11 @@ function renderBgPanel() {
   const l = bgLayer(); if (!l) return '';
   const op = l.opacity != null ? l.opacity : 1;
   return `
-    <div class="cx-block-desc" style="margin-bottom:6px">这里调整的是<b>背景图在画布里的位置/大小</b>，不是图层顺序。要回到普通图层，请点「恢复为浮层」。</div>
-    <div class="cx-row"><label>大小</label><div class="cx-btng">
+    <div class="cx-block-desc" style="margin-bottom:6px">当前背景图位于拼图格子下方。即使点不到画布里的背景，也可在此调整。</div>
+    <div class="cx-row"><label>位置/缩放</label><div class="cx-btng">
       <button data-bgctl="zin">放大</button><button data-bgctl="zout">缩小</button>
-    </div></div>
-    <div class="cx-row"><label>位置</label><div class="cx-btng">
-      <button data-bgctl="up">背景上移</button><button data-bgctl="down">背景下移</button>
-      <button data-bgctl="left">背景左移</button><button data-bgctl="right">背景右移</button>
+      <button data-bgctl="up">上</button><button data-bgctl="down">下</button>
+      <button data-bgctl="left">左</button><button data-bgctl="right">右</button>
     </div></div>
     <div class="cx-slider2" data-bgop="1"><label>透明度</label><input type="range" min="20" max="100" step="5" value="${Math.round(op * 100)}"><span class="cx-val">${Math.round(op * 100)}</span></div>
     <div class="cx-addrow">
