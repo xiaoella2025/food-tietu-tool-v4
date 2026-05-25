@@ -7,6 +7,12 @@
 // 设计空间(design space)：按所选比例确定 designW×designH（长边 1080）。
 // 所有布局/文字/贴图坐标都在 design 空间；预览按 sPrev 缩放，导出按 1:1（可选HD 2x）。
 // 不接 AI / 不联网 / 不引入外部依赖；ZIP 用内置 store 实现。
+//
+// ===== TODO（后续“批量操作 / 批量处理”，本轮未做，勿遗漏）=====
+// 成图编辑页(EditWorkbench)：多选图片 / 批量保存 / 批量应用裁剪 / 批量调色 /
+//   批量清晰 / 批量字幕裁切 / 批量改比例(3:4、4:3 等)。
+// 拼图导出页(本文件)：多个拼图工程统一导出 / ZIP 批量打包 / 批量导出单图·拼图·文案。
+// 当前已具备单工程 ZIP(拼图+单图+copy.txt)，批量为多工程循环导出，后续补。
 
 import { ART_PRESETS, ART_GROUP_A, ART_GROUP_B, ART_GROUP_C } from './EditWorkbench.js';
 
@@ -150,7 +156,7 @@ let cellDrag = { active: false, sx: 0, sy: 0, ox0: 0, oy0: 0, maxX: 0, maxY: 0 }
 let lastCells = [];      // 最近一次绘制的格子 [{itemId,x,y,w,h,rot}]（design 坐标）
 let rightTab = 'set';    // set | text（窄屏 tab）
 let awaitingReplace = false;  // 自由图片"替换图片"待选状态
-let accordion = { pub: true, layout: true, pin: true, canvas: false, small: false, sticker: false, scheme: false, export: false };
+let accordion = { scheme: true, pub: true, layout: true, pin: true, canvas: false, small: false, sticker: false, export: false };
 
 let drag = { active: false, id: null, ox: 0, oy: 0 };
 let resize = { active: false, id: null, handle: null, sx: 0, sy: 0, startFont: 0, startW: 0, startBoxW: 0, startBoxH: 0, startSize: 0 };
@@ -251,6 +257,10 @@ function renderQueue() {
                 <button class="cx-qmv" data-mv="up" data-id="${it.frameId}" title="左移">‹</button>
                 <button class="cx-qmv" data-mv="down" data-id="${it.frameId}" title="右移">›</button>
               </div>
+              <div class="cx-qrow">
+                <button class="cx-qadd" data-addcanvas="${it.frameId}" title="把这张图作为自由图片加到画布">＋画布</button>
+                <button class="cx-qrep ${imgSelected() ? '' : 'dim'}" data-replace="${it.frameId}" title="替换当前选中的画布图片（保留位置/大小/旋转/层级）">替换选中图</button>
+              </div>
             </div>`;
         }).join('')}
       </div>
@@ -269,13 +279,13 @@ function renderRight() {
       <div class="cx-right-dual" data-rtab="${rightTab}" id="cx-right-dual">
         <div class="cx-ws cx-ws-set">
           <div class="cx-ws-title">拼图设置</div>
-          ${sec('pub', '① 发布与比例', renderPub())}
-          ${sec('layout', '② 拼图布局', renderLayout())}
-          ${sec('pin', '③ 拼图样式', renderPinStyle())}
-          ${sec('canvas', '④ 画布与边框', renderCanvasBlock())}
-          ${sec('small', '⑤ 小图样式', renderSmall())}
-          ${sec('sticker', '⑥ 贴图素材', renderStickerBlock())}
-          ${sec('scheme', '⑦ 拼图方案', renderSchemeBlock())}
+          ${sec('scheme', '① 拼图工程 / 版式模板', renderSchemeBlock())}
+          ${sec('pub', '② 发布与比例', renderPub())}
+          ${sec('layout', '③ 拼图布局', renderLayout())}
+          ${sec('pin', '④ 拼图样式', renderPinStyle())}
+          ${sec('canvas', '⑤ 画布与边框', renderCanvasBlock())}
+          ${sec('small', '⑥ 小图样式', renderSmall())}
+          ${sec('sticker', '⑦ 贴图素材', renderStickerBlock())}
           ${sec('export', '⑧ 导出设置', renderExportBlock())}
         </div>
         <div class="cx-ws cx-ws-text">
@@ -410,6 +420,12 @@ function layerOrderBar() {
 function renderImageLayerPanel(l) {
   return `
     ${layerOrderBar()}
+    <div class="cx-flabel">图片取景（在框内调整主体）</div>
+    <div class="cx-row"><div class="cx-btng">
+      <button data-nudge="zin">放大</button><button data-nudge="zout">缩小</button>
+      <button data-nudge="up">上</button><button data-nudge="down">下</button>
+      <button data-nudge="left">左</button><button data-nudge="right">右</button>
+    </div></div>
     <div class="cx-slider2" data-img="innerScale"><label>取景缩放</label><input type="range" min="100" max="280" step="5" value="${Math.round((l.innerScale || 1) * 100)}"><span class="cx-val">${Math.round((l.innerScale || 1) * 100)}</span></div>
     <div class="cx-slider2" data-img="innerOffX"><label>取景左右</label><input type="range" min="-100" max="100" step="5" value="${Math.round((l.innerOffX || 0) * 100)}"><span class="cx-val">${Math.round((l.innerOffX || 0) * 100)}</span></div>
     <div class="cx-slider2" data-img="innerOffY"><label>取景上下</label><input type="range" min="-100" max="100" step="5" value="${Math.round((l.innerOffY || 0) * 100)}"><span class="cx-val">${Math.round((l.innerOffY || 0) * 100)}</span></div>
@@ -501,8 +517,8 @@ function drawDesign(c) {
   lastCells = [];
   if (C.settings.pinstyle === 'free') {
     drawFrame(c, C.settings.frame);
-    (C.layers || []).filter(l => l.kind === 'image').forEach(l => drawLayer(c, l));
-    (C.layers || []).filter(l => l.kind !== 'image').forEach(l => drawLayer(c, l));
+    // 按数组顺序绘制所有层（图片/文字/贴图统一受图层顺序控制）
+    (C.layers || []).forEach(l => drawLayer(c, l));
   } else {
     drawCells(c, cx0, cy0, cw, ch);
     drawFrame(c, C.settings.frame);
@@ -905,6 +921,7 @@ function handleRightClick(e) {
   // 图层顺序
   const ord = t.closest('[data-order]'); if (ord) { reorderLayer(ord.dataset.order); return; }
   // 自由图片取景/替换
+  const nd = t.closest('[data-nudge]'); if (nd) { const l = curLayer(); if (l && l.kind === 'image') { const k = nd.dataset.nudge; if (k === 'zin') l.innerScale = Math.min(2.8, (l.innerScale || 1) + 0.1); else if (k === 'zout') l.innerScale = Math.max(1, (l.innerScale || 1) - 0.1); else if (k === 'up') l.innerOffY = Math.max(-1, (l.innerOffY || 0) - 0.1); else if (k === 'down') l.innerOffY = Math.min(1, (l.innerOffY || 0) + 0.1); else if (k === 'left') l.innerOffX = Math.max(-1, (l.innerOffX || 0) - 0.1); else if (k === 'right') l.innerOffX = Math.min(1, (l.innerOffX || 0) + 0.1); redraw(); refreshTextStyle(); } return; }
   if (t.id === 'cx-img-resetview') { const l = curLayer(); if (l) { l.innerScale = 1; l.innerOffX = 0; l.innerOffY = 0; redraw(); refreshTextStyle(); } return; }
   if (t.id === 'cx-img-replace') { awaitingReplace = !awaitingReplace; refreshTextStyle(); if (awaitingReplace) toast('请点击底部素材，替换当前选中图片'); return; }
   const at = t.closest('[data-addtext]'); if (at) { addText(at.dataset.addtext); return; }
@@ -949,14 +966,12 @@ function setNum(k, v) {
 function bindQueue() {
   const q = document.getElementById('cx-queue'); if (!q) return;
   q.addEventListener('click', e => {
+    const add = e.target.closest('[data-addcanvas]'); if (add) { addFreeImageFromSource(add.dataset.addcanvas); return; }
+    const rep = e.target.closest('[data-replace]'); if (rep) { replaceSelectedImage(rep.dataset.replace); return; }
     const tg = e.target.closest('[data-toggle]'); if (tg) { const it = C.items.find(x => x.frameId === tg.dataset.toggle); if (it) it.on = !it.on; loadImages(() => { refreshQueue(); redraw(); }); return; }
     const mv = e.target.closest('[data-mv]'); if (mv) { moveItem(mv.dataset.id, mv.dataset.mv === 'up' ? -1 : 1); return; }
-    // 替换自由图片：等待替换状态下点素材卡 → 替换当前选中图片层的 frameId
-    if (awaitingReplace) {
-      const card = e.target.closest('.cx-qcard');
-      const l = curLayer();
-      if (card && l && l.kind === 'image') { l.frameId = card.dataset.it; awaitingReplace = false; loadImages(() => { redraw(); refreshTextStyle(); }); toast('已替换图片'); return; }
-    }
+    // 右侧"替换图片"待选状态下点卡片也可替换
+    if (awaitingReplace) { const card = e.target.closest('.cx-qcard'); if (card) { replaceSelectedImage(card.dataset.it); return; } }
   });
   // 拖拽排序
   let dragId = null;
@@ -965,6 +980,27 @@ function bindQueue() {
     card.addEventListener('dragover', e => e.preventDefault());
     card.addEventListener('drop', e => { e.preventDefault(); const tgt = card.dataset.it; reorder(dragId, tgt); });
   });
+}
+function imgSelected() { const l = curLayer(); return !!(l && l.kind === 'image'); }
+// 把底部素材作为自由图片层加到画布（自动切到自由摆放）
+function addFreeImageFromSource(frameId) {
+  const s = srcById(frameId); if (!s) return;
+  C.layers = C.layers || [];
+  if (C.settings.pinstyle !== 'free') { C.settings.pinstyle = 'free'; }
+  const id = 'IMG-' + frameId + '-' + Math.random().toString(36).slice(2, 5);
+  const n = C.layers.filter(l => l.kind === 'image').length;
+  C.layers.push({ id, kind: 'image', frameId, xPct: 0.3 + (n % 2) * 0.4, yPct: 0.3 + Math.floor(n / 2) * 0.3, scale: 1, rotate: 0, innerScale: 1, innerOffX: 0, innerOffY: 0 });
+  selectedLayerId = id; awaitingReplace = false;
+  refreshRight(); loadImages(() => { sizeCanvas(); redraw(); });
+  toast('已添加到画布（自由摆放）');
+}
+function replaceSelectedImage(frameId) {
+  const l = curLayer();
+  if (!l || l.kind !== 'image') { toast('请先在画布上选中一张图片，再点"替换选中图"'); return; }
+  l.frameId = frameId; l.innerScale = 1; l.innerOffX = 0; l.innerOffY = 0; // 保留框位置/大小/旋转/层级，取景重置适配新图
+  awaitingReplace = false;
+  loadImages(() => { redraw(); refreshTextStyle(); });
+  toast('已替换选中图片');
 }
 function moveItem(id, dir) { const i = C.items.findIndex(x => x.frameId === id); const j = i + dir; if (i < 0 || j < 0 || j >= C.items.length) return; [C.items[i], C.items[j]] = [C.items[j], C.items[i]]; refreshQueue(); redraw(); }
 function reorder(srcId, tgtId) { if (!srcId || srcId === tgtId) return; const from = C.items.findIndex(x => x.frameId === srcId); const to = C.items.findIndex(x => x.frameId === tgtId); if (from < 0 || to < 0) return; const [m] = C.items.splice(from, 1); C.items.splice(to, 0, m); refreshQueue(); redraw(); }

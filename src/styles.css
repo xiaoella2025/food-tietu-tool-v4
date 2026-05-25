@@ -2009,3 +2009,9 @@ textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(
 .cx-block-desc b { color: var(--color-primary); }
 .cx-q { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; background: var(--color-primary); color: #fff; font-size: 10px; font-weight: 800; cursor: help; }
 .cx-delbtn { z-index: 60; }
+
+/* 拼图导出返工4：队列加图/替换按钮 */
+.cx-qadd, .cx-qrep { flex: 1; height: 22px; padding: 0; font-size: 10px; font-weight: 700; }
+.cx-qadd { color: var(--color-primary); border-color: var(--color-primary); }
+.cx-qrep.dim { opacity: 0.5; }
+.cx-inline { box-sizing: border-box; min-height: 2.2em; line-height: 1.4; }
