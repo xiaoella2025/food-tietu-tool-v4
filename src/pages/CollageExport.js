@@ -397,24 +397,24 @@ function collectStep2Body() {
 }
 function renderStep2Body() {
   const list = collectStep2Body();
-  if (!list.length) return `<div class="cx-block-desc" style="margin-bottom:8px">来自成图编辑的正文：暂无。在第二步「成图编辑」写了正文并保存后，会显示在这里，可一键导入/复制。</div>`;
   return `
-    <div class="cx-acc open" data-acc="step2body" style="margin-bottom:8px">
-      <div class="cx-acc-head"><span>来自成图编辑的正文（${list.length}）</span><span></span></div>
-      <div class="cx-acc-body">
-        <div class="cx-step2-list">${list.map(x => `<div class="cx-step2-item"><b>${escapeHTML(x.name)}</b>：${escapeHTML(x.body.slice(0, 40))}${x.body.length > 40 ? '…' : ''}</div>`).join('')}</div>
-        <div class="cx-addrow">
-          <button class="cx-add" id="cx-import-body">导入到说明文字</button>
-          <button class="cx-add" id="cx-copy-body">复制这些正文</button>
-        </div>
+    <div class="cx-pubbody">
+      <div class="cx-flabel">发布正文 / 公众号正文 <span class="cx-q" title="发布用文案，默认不上图。仅用于编辑/复制/导出文案。">?</span></div>
+      <div class="cx-block-desc" style="margin-bottom:6px">正文是发布文案（公众号/小红书/视频号），<b>默认不上图</b>。要上图请用总标题/副标题/标签。</div>
+      <textarea id="cx-pubbody-text" rows="5" placeholder="在此撰写发布正文（不会出现在图片上）">${escapeHTML(C.copyBody || '')}</textarea>
+      <div class="cx-addrow" style="margin-top:6px">
+        <button class="cx-add" id="cx-import-body" ${list.length ? '' : 'disabled'}>从第二步正文导入</button>
+        <button class="cx-add" id="cx-copy-pubbody">复制正文</button>
+        <button class="cx-add" id="cx-clear-pubbody">清空正文</button>
       </div>
+      ${list.length ? `<div class="cx-step2-list">${list.map(x => `<div class="cx-step2-item"><b>${escapeHTML(x.name)}</b>：${escapeHTML(x.body.slice(0, 40))}${x.body.length > 40 ? '…' : ''}</div>`).join('')}</div>` : `<div class="cx-note">第二步「成图编辑」写了正文并保存后，会在此列出，可一键导入。</div>`}
     </div>`;
 }
 function renderTextStyle() {
   const l = curLayer();
-  if (!l) return `<div class="cx-empty">点画布上的文字/贴图/图片选中，或用上方按钮加一段文字</div>`;
+  if (!l) return `<div class="cx-empty">点画布上的文字/贴图/图片选中，或用上方按钮加一段文字（正文请用上方「发布正文」框，不上图）</div>`;
   if (l.kind === 'image') return renderImageLayerPanel(l);
-  if (l.kind === 'sticker') return `${layerOrderBar()}<div class="cx-empty" style="padding:8px">贴图：画布拖动移动、拖角缩放、顶部圆点旋转、右上角×或Delete删除。</div>`;
+  if (l.kind === 'sticker') return `${layerOrderBar()}${bgToggleBtn(l)}<div class="cx-empty" style="padding:8px">贴图/粘贴图：画布拖动移动、拖角缩放、顶部圆点旋转、右上角×或Delete删除。</div>`;
   const col = (v, d) => (typeof v === 'string' && /^#/.test(v)) ? v : d;
   return `
     ${layerOrderBar()}
@@ -448,9 +448,13 @@ function layerOrderBar() {
     <button data-order="bottom" title="置底">置底</button>
   </div></div>`;
 }
+function bgToggleBtn(l) {
+  return `<button class="cx-add ${l.asBg ? 'primary' : ''}" data-bgtoggle="1" style="width:100%;margin-bottom:6px">${l.asBg ? '恢复为浮层' : '置为背景（放到拼图格子下面）'}</button>`;
+}
 function renderImageLayerPanel(l) {
   return `
     ${layerOrderBar()}
+    ${bgToggleBtn(l)}
     <div class="cx-flabel">图片取景（在框内调整主体）</div>
     <div class="cx-row"><div class="cx-btng">
       <button data-nudge="zin">放大</button><button data-nudge="zout">缩小</button>
@@ -549,19 +553,25 @@ function drawDesign(c) {
   const pad = C.settings.outerPad + framePad;
   const cx0 = pad, cy0 = pad, cw = designW - pad * 2, ch = designH - pad * 2;
   lastCells = [];
+  const layers = C.layers || [];
+  const bgLayers = layers.filter(l => l.asBg);     // 被设为背景的层（置于拼图格子下方）
+  const fgLayers = layers.filter(l => !l.asBg);    // 浮层
   if (C.settings.pinstyle === 'free') {
     drawFrame(c, C.settings.frame);
-    if (!(C.layers || []).length) {
+    if (!layers.length) {
       c.fillStyle = '#8096b8'; c.font = `${Math.round(designW * 0.032)}px ${FONT_STACK}`; c.textAlign = 'center'; c.textBaseline = 'middle';
       c.fillText('请从底部选择图片添加到画布', designW / 2, designH / 2);
       c.textAlign = 'left'; c.textBaseline = 'alphabetic';
     }
-    // 按数组顺序绘制所有层（图片/文字/贴图统一受图层顺序控制）
-    (C.layers || []).forEach(l => drawLayer(c, l));
+    // 背景层 → 其余层（按数组顺序，受图层顺序控制）
+    bgLayers.forEach(l => drawLayer(c, l));
+    fgLayers.forEach(l => drawLayer(c, l));
   } else {
+    // 总背景层(被设为背景的粘贴图) → 拼图格子层 → 浮层(文字/贴图/未设背景的图)
+    bgLayers.forEach(l => drawLayer(c, l));
     drawCells(c, cx0, cy0, cw, ch);
     drawFrame(c, C.settings.frame);
-    (C.layers || []).filter(l => l.kind !== 'image').forEach(l => drawLayer(c, l));
+    fgLayers.filter(l => l.kind !== 'image').forEach(l => drawLayer(c, l));
   }
 }
 
@@ -945,8 +955,8 @@ function handleRightClick(e) {
   const t = e.target;
   const pub = t.closest('[data-pub]'); if (pub) { C.settings.ratio = pub.dataset.pub; applyRatio(C.settings.ratio); refreshRight(); sizeCanvas(); redraw(); return; }
   const ra = t.closest('[data-ratio]'); if (ra) { C.settings.ratio = ra.dataset.ratio; applyRatio(C.settings.ratio); refreshRight(); sizeCanvas(); redraw(); return; }
-  const la = t.closest('[data-layout]'); if (la) { pushUndoC(); const L = LAYOUTS.find(x => x.id === la.dataset.layout); C.settings.layout = L.id; C.settings.cols = L.cols; C.settings.pinstyle = 'grid'; C.items.forEach(it => { if (!it.on) it.on = true; }); refreshRight(); loadImages(() => redraw()); return; }
-  const pin = t.closest('[data-pin]'); if (pin) { pushUndoC(); C.settings.pinstyle = pin.dataset.pin; cellSel = null; if (C.settings.pinstyle !== 'free') C.items.forEach(it => { if (!it.on) it.on = true; }); if (C.settings.pinstyle === 'free') ensureFreeImages(); refreshRight(); loadImages(() => redraw()); return; }
+  const la = t.closest('[data-layout]'); if (la) { pushUndoC(); const L = LAYOUTS.find(x => x.id === la.dataset.layout); C.settings.layout = L.id; C.settings.cols = L.cols; C.settings.pinstyle = 'grid'; if (participants().length === 0) toast('请先在底部选择要参与拼图的图片'); refreshRight(); loadImages(() => redraw()); return; }
+  const pin = t.closest('[data-pin]'); if (pin) { pushUndoC(); C.settings.pinstyle = pin.dataset.pin; cellSel = null; if (C.settings.pinstyle === 'free') ensureFreeImages(); else if (participants().length === 0) toast('请先在底部选择要参与拼图的图片'); refreshRight(); loadImages(() => redraw()); return; }
   if (t.id === 'cx-free-reset') { resetFreeImages(); loadImages(() => redraw()); return; }
   const bg = t.closest('[data-bg]'); if (bg) { const b = BG_PRESETS.find(x => x.id === bg.dataset.bg); C.settings.bg = { ...b }; refreshRight(); redraw(); return; }
   const fr = t.closest('[data-frame]'); if (fr) { C.settings.frame = fr.dataset.frame; refreshRight(); redraw(); return; }
@@ -962,13 +972,15 @@ function handleRightClick(e) {
   if (t.id === 'cx-preset-save') { presetSave(); return; }
   if (t.id === 'cx-preset-update') { presetUpdate(); return; }
   // 图层顺序
+  if (t.closest('[data-bgtoggle]')) { const l = curLayer(); if (l) { pushUndoC(); l.asBg = !l.asBg; redraw(); refreshTextStyle(); toast(l.asBg ? '已置为背景' : '已恢复为浮层'); } return; }
   const ord = t.closest('[data-order]'); if (ord) { reorderLayer(ord.dataset.order); return; }
   // 自由图片取景/替换
   const nd = t.closest('[data-nudge]'); if (nd) { const l = curLayer(); if (l && l.kind === 'image') { pushUndoC(); const k = nd.dataset.nudge; if (k === 'zin') l.innerScale = Math.min(2.8, (l.innerScale || 1) + 0.1); else if (k === 'zout') l.innerScale = Math.max(1, (l.innerScale || 1) - 0.1); else if (k === 'up') l.innerOffY = Math.max(-1, (l.innerOffY || 0) - 0.1); else if (k === 'down') l.innerOffY = Math.min(1, (l.innerOffY || 0) + 0.1); else if (k === 'left') l.innerOffX = Math.max(-1, (l.innerOffX || 0) - 0.1); else if (k === 'right') l.innerOffX = Math.min(1, (l.innerOffX || 0) + 0.1); redraw(); refreshTextStyle(); } return; }
   if (t.id === 'cx-img-resetview') { const l = curLayer(); if (l) { l.innerScale = 1; l.innerOffX = 0; l.innerOffY = 0; redraw(); refreshTextStyle(); } return; }
   if (t.id === 'cx-img-replace') { awaitingReplace = !awaitingReplace; refreshTextStyle(); if (awaitingReplace) toast('请点击底部素材，替换当前选中图片'); return; }
-  if (t.id === 'cx-import-body') { const list = collectStep2Body(); if (!list.length) { toast('暂无第二步正文'); return; } const text = list.map(x => x.body).join('\n'); pushUndoC(); C.layers = C.layers || []; const l = { id: 'T-' + Date.now() + Math.random().toString(36).slice(2, 5), kind: 'text', ...defaultText(), text, fontSize: 38, strokeOn: false, bgOn: true, xPct: 0.1, yPct: 0.8 }; C.layers.push(l); selectedLayerId = l.id; refreshTextStyle(); redraw(); toast('已把第二步正文导入为说明文字'); return; }
-  if (t.id === 'cx-copy-body') { const list = collectStep2Body(); const text = list.map(x => x.body).join('\n'); if (!text) { toast('暂无第二步正文'); return; } if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => toast('已复制第二步正文')).catch(() => fallbackCopy(text)); else fallbackCopy(text); return; }
+  if (t.id === 'cx-import-body') { const list = collectStep2Body(); if (!list.length) { toast('暂无第二步正文'); return; } const merged = list.map(x => `${x.name}：\n${x.body}`).join('\n\n'); C.copyBody = (C.copyBody || '').trim() ? (C.copyBody.trim() + '\n\n' + merged) : merged; const ta = document.getElementById('cx-pubbody-text'); if (ta) ta.value = C.copyBody; toast('已导入到发布正文（不上图）'); return; }
+  if (t.id === 'cx-copy-pubbody') { const text = (C.copyBody || '').trim(); if (!text) { toast('正文为空'); return; } if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => toast('已复制正文')).catch(() => fallbackCopy(text)); else fallbackCopy(text); return; }
+  if (t.id === 'cx-clear-pubbody') { if (!(C.copyBody || '').trim()) return; if (!window.confirm('清空发布正文？')) return; C.copyBody = ''; const ta = document.getElementById('cx-pubbody-text'); if (ta) ta.value = ''; toast('已清空正文'); return; }
   const at = t.closest('[data-addtext]'); if (at) { addText(at.dataset.addtext); return; }
   const al = t.closest('[data-align]'); if (al) { const l = curLayer(); if (l) { l.align = al.dataset.align; redraw(); refreshTextStyle(); } return; }
   const sw = t.closest('[data-colorfor]'); if (sw) { const l = curLayer(); if (l) { l[sw.dataset.colorfor] = sw.dataset.color; redraw(); refreshTextStyle(); } return; }
@@ -983,6 +995,7 @@ function handleRightClick(e) {
 }
 function handleRightInput(e) {
   const t = e.target;
+  if (t.id === 'cx-pubbody-text') { C.copyBody = t.value; return; }
   if (t.id === 'cx-scheme-sel') { if (t.value !== '') schemeLoad(+t.value); return; }
   const cz = t.closest('[data-cellzoom]'); if (cz) { const it = itemById(cellSel); if (it) { it.scale = parseFloat(t.value) / 100; const sp = cz.querySelector('.cx-val'); if (sp) sp.textContent = Math.round(parseFloat(t.value)); redraw(); } return; }
   const im = t.closest('[data-img]'); if (im) { const l = curLayer(); if (l) { const k = im.dataset.img; const v = parseFloat(t.value); if (k === 'innerScale') l.innerScale = v / 100; else l[k] = v / 100; const sp = im.querySelector('.cx-val'); if (sp) sp.textContent = Math.round(v); redraw(); } return; }
@@ -1133,7 +1146,7 @@ function setSchemes(a) { return safeSet('cxSchemes', a); }
 function getPresets() { try { return JSON.parse(localStorage.getItem('cxPresets') || '[]'); } catch { return []; } }
 function setPresets(a) { return safeSet('cxPresets', a); }
 // 工程快照：只存结构 + frameId（不重复存参与图片 dataUrl）；贴图上传图保留 dataUrl
-function snapshot() { return JSON.parse(JSON.stringify({ items: C.items, layers: (C.layers || []).map(l => { const { _box, ...r } = l; return r; }), settings: C.settings })); }
+function snapshot() { return JSON.parse(JSON.stringify({ items: C.items, layers: (C.layers || []).map(l => { const { _box, ...r } = l; return r; }), settings: C.settings, copyBody: C.copyBody || '' })); }
 // ===== 撤销 =====
 function pushUndoC() { undoStackC.push(snapshot()); if (undoStackC.length > 10) undoStackC.shift(); refreshUndoBtn(); }
 function refreshUndoBtn() { const b = document.getElementById('cx-undo'); if (b) b.disabled = undoStackC.length === 0; }
@@ -1146,7 +1159,7 @@ export function undoCollageExport() {
   refreshRight(); refreshQueue(); loadImages(() => { sizeCanvas(); redraw(); }); refreshUndoBtn();
   toast('已撤销');
 }
-function loadSnapshot(s) { C.items = JSON.parse(JSON.stringify(s.items || [])); C.layers = (JSON.parse(JSON.stringify(s.layers || []))).map(normalizeLayer); C.settings = Object.assign(defaultSettings(), JSON.parse(JSON.stringify(s.settings || {}))); if (!C.settings.small) C.settings.small = defaultSettings().small; }
+function loadSnapshot(s) { C.items = JSON.parse(JSON.stringify(s.items || [])); C.layers = (JSON.parse(JSON.stringify(s.layers || []))).map(normalizeLayer); C.settings = Object.assign(defaultSettings(), JSON.parse(JSON.stringify(s.settings || {}))); if (!C.settings.small) C.settings.small = defaultSettings().small; C.copyBody = s.copyBody || ''; }
 function schemeSave() { const sel = document.getElementById('cx-scheme-sel'); const a = getSchemes(); if (sel && sel.value !== '') { a[+sel.value].snap = snapshot(); if (setSchemes(a)) toast('已保存当前拼图'); } else { const name = prompt('拼图工程名称：', '拼图' + (a.length + 1)); if (!name) return; a.push({ name: name.trim(), snap: snapshot() }); if (setSchemes(a)) { toast('已保存当前拼图'); refreshRight(); } } }
 function schemeCopyCurrent() { const a = getSchemes(); const name = prompt('复制为新拼图，名称：', '拼图副本'); if (!name) return; a.push({ name: name.trim(), snap: snapshot() }); if (setSchemes(a)) { toast('已复制为新拼图工程'); refreshRight(); } }
 function schemeDel() { const sel = document.getElementById('cx-scheme-sel'); const a = getSchemes(); if (!sel || sel.value === '') { toast('请先在下拉里选择要删除的拼图工程'); return; } if (!window.confirm('删除该拼图工程？（不影响底部素材）')) return; a.splice(+sel.value, 1); setSchemes(a); toast('已删除'); refreshRight(); }
@@ -1242,8 +1255,11 @@ function exportCurrent() {
 function downloadData(dataUrl, name) { const a = document.createElement('a'); a.href = dataUrl; a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
 
 function buildCopyText() {
-  const layers = (C.layers || []).filter(l => l.kind !== 'sticker' && l.text && l.text.trim());
-  return layers.map(l => l.text.trim()).join('\n');
+  const onImg = (C.layers || []).filter(l => l.kind === 'text' && l.text && l.text.trim()).map(l => l.text.trim());
+  const parts = [];
+  if (onImg.length) parts.push(onImg.join('\n'));
+  if ((C.copyBody || '').trim()) parts.push(C.copyBody.trim());
+  return parts.join('\n\n');
 }
 function copyCopy() {
   const txt = buildCopyText();

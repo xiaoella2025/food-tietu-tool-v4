@@ -38,6 +38,7 @@ const state = {
   collage: {
     items: [],
     layers: [],
+    copyBody: '',
     settings: {
       ratio: '3:4', customW: 3, customH: 4,
       layout: 'g4', cols: 2, pinstyle: 'grid', gap: 12, outerPad: 24,
