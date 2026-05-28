@@ -102,7 +102,7 @@ let selectedLayerId = null;
 let baseImageEl = null;
 let baseW = 0, baseH = 0;
 let canvas = null, ctx = null;
-let viewW = 0, viewH = 0, viewScale = 1;
+let viewW = 0, viewH = 0, viewScale = 1, viewDpr = 1;
 
 let drag = { active: false, layerId: null, ox: 0, oy: 0 };
 let resize = { active: false, layerId: null, handle: null, sx: 0, sy: 0, startFont: 0, startWidth: 0, startBoxW: 0, startBoxH: 0 };
@@ -534,8 +534,12 @@ function sizeCanvas() {
   viewScale = Math.min(maxW / baseW, maxH / baseH, 1);
   viewW = Math.max(40, Math.round(baseW * viewScale));
   viewH = Math.max(40, Math.round(baseH * viewScale));
-  canvas.width = viewW;
-  canvas.height = viewH;
+  // 按设备像素比放大内部分辨率，避免预览发糊；CSS 显示尺寸仍为 viewW/viewH
+  viewDpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.round(viewW * viewDpr);
+  canvas.height = Math.round(viewH * viewDpr);
+  canvas.style.width = viewW + 'px';
+  canvas.style.height = viewH + 'px';
 }
 
 // ===== 绘制 =====
@@ -549,7 +553,11 @@ function buildFilter(scaleForBlur) {
 
 function drawAll() {
   if (!ctx) return;
-  ctx.clearRect(0, 0, viewW, viewH);
+  // 重置 + 应用 DPR 缩放（内部分辨率 = viewW*dpr × viewH*dpr，绘制坐标仍按 viewW/viewH）
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.setTransform(viewDpr, 0, 0, viewDpr, 0, 0);
   if (!baseImageEl) return;
   // 图片 + 实时调色/模糊预览
   ctx.save();
@@ -1527,6 +1535,7 @@ function composeCurrent(cb) {
     const out = document.createElement('canvas');
     out.width = W; out.height = H;
     const oc = out.getContext('2d');
+    oc.imageSmoothingEnabled = true; oc.imageSmoothingQuality = 'high';
     oc.drawImage(img, 0, 0, W, H);
     p.layers.forEach(l => drawLayer(oc, l, W, H, 1));
     cb && cb(out.toDataURL('image/png'), frame, p);
