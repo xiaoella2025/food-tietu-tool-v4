@@ -95,7 +95,7 @@ const BG_PRESETS = [
   { id: 'green-grad', label: '清新渐变', type: 'grad', color: '#e8f5e9', color2: '#c8e6c9' },
   { id: 'blue-grad', label: '冷渐变', type: 'grad', color: '#e3f2fd', color2: '#bbdefb' },
   // 小红书风（本地 Canvas pattern 绘制，零素材成本）
-  { id: 'memo', label: '备忘录', type: 'pattern', color: '#fff7d6', line: '#f1d97a' },
+  { id: 'memo', label: '备忘录', type: 'pattern', color: '#fffaee', line: 'rgba(184,148,86,0.35)' },
   { id: 'sticky', label: '便签纸', type: 'pattern', color: '#fff9c4' },
   { id: 'journal', label: '手账纸', type: 'pattern', color: '#fffaf2', dot: '#d8c9a8' },
   { id: 'grid-paper', label: '网格纸', type: 'pattern', color: '#fafaf2', line: '#e6e2d2' },
@@ -196,7 +196,7 @@ export function renderCollageExport({ frames, editResults, editProjects, collage
 
   syncItems();
   applyRatio(C.settings.ratio);
-  if (C.settings.pinstyle === 'free') ensureFreeImages();
+  if (isFreeMode()) ensureFreeImages();
 
   const sources = sourceList();
   if (sources.length === 0) {
@@ -343,7 +343,7 @@ function renderPinStyle() {
     <div class="cx-chips">${PIN_STYLES.map(p => `<button class="cx-chip ${C.settings.pinstyle === p.id ? 'active' : ''}" data-pin="${p.id}">${p.label}</button>`).join('')}</div>
     <div class="cx-note">规则宫格用上方「列数」；不规则样式按参与图前几张填充大小格；自由摆放可任意拖动/缩放/旋转每张图。</div>
     ${C.settings.pinstyle !== 'free' && cellSel ? `<div class="cx-slider" data-cellzoom="1"><label>选中格缩放</label><input type="range" min="100" max="260" step="5" value="${Math.round((itemById(cellSel)?.scale || 1) * 100)}"><span class="cx-val">${Math.round((itemById(cellSel)?.scale || 1) * 100)}</span></div><div class="cx-note">点画布里的小图可选中，拖动平移、用此滑杆或滚轮缩放。</div>` : ''}
-    ${C.settings.pinstyle === 'free' ? `<button class="cx-add" id="cx-free-reset" style="width:100%;margin-top:6px">重新铺开自由图片</button>` : ''}
+    ${isFreeMode() ? `<button class="cx-add" id="cx-free-reset" style="width:100%;margin-top:6px">重新铺开自由图片</button>` : ''}
   `;
 }
 
@@ -545,9 +545,9 @@ function renderImageLayerPanel(l) {
     ${bgToggleBtn(l)}
     <div class="cx-flabel">图片取景（在框内调整主体）</div>
     <div class="cx-row"><div class="cx-btng">
-      <button data-nudge="zin">放大</button><button data-nudge="zout">缩小</button>
-      <button data-nudge="up">上</button><button data-nudge="down">下</button>
-      <button data-nudge="left">左</button><button data-nudge="right">右</button>
+      <button data-nudge="zin">取景放大</button><button data-nudge="zout">取景缩小</button>
+      <button data-nudge="up">取景上移</button><button data-nudge="down">取景下移</button>
+      <button data-nudge="left">取景左移</button><button data-nudge="right">取景右移</button>
     </div></div>
     <div class="cx-slider2" data-img="innerScale"><label>取景缩放</label><input type="range" min="100" max="280" step="5" value="${Math.round((l.innerScale || 1) * 100)}"><span class="cx-val">${Math.round((l.innerScale || 1) * 100)}</span></div>
     <div class="cx-slider2" data-img="innerOffX"><label>取景左右</label><input type="range" min="-100" max="100" step="5" value="${Math.round((l.innerOffX || 0) * 100)}"><span class="cx-val">${Math.round((l.innerOffX || 0) * 100)}</span></div>
@@ -651,7 +651,7 @@ function drawDesign(c) {
   const layers = C.layers || [];
   const bgLayers = layers.filter(l => l.asBg);     // 被设为背景的层（置于拼图格子下方）
   const fgLayers = layers.filter(l => !l.asBg);    // 浮层
-  if (C.settings.pinstyle === 'free') {
+  if (isFreeMode()) {
     drawFrame(c, C.settings.frame);
     if (!layers.length) {
       c.fillStyle = '#8096b8'; c.font = `${Math.round(designW * 0.032)}px ${FONT_STACK}`; c.textAlign = 'center'; c.textBaseline = 'middle';
@@ -689,10 +689,12 @@ function drawPatternBg(c, bg) {
   c.fillStyle = bg.color || '#ffffff'; c.fillRect(0, 0, W, H);
   switch (bg.id) {
     case 'memo': {
-      c.strokeStyle = bg.line || '#e8d9a8'; c.lineWidth = Math.max(1, W * 0.0015);
-      const gap = Math.max(36, W * 0.045);
-      for (let y = gap * 1.5; y < H; y += gap) { c.beginPath(); c.moveTo(W * 0.06, y); c.lineTo(W * 0.94, y); c.stroke(); }
-      c.fillStyle = 'rgba(231,76,60,0.55)'; c.fillRect(W * 0.08, 0, Math.max(2, W * 0.003), H); break;
+      // 苹果备忘录风：暖米黄底 + 极淡细横线 + 极淡左侧竖线
+      c.strokeStyle = bg.line || 'rgba(184,148,86,0.35)'; c.lineWidth = Math.max(1, W * 0.0012);
+      const gap = Math.max(40, W * 0.052);
+      for (let y = gap * 1.4; y < H; y += gap) { c.beginPath(); c.moveTo(W * 0.06, y); c.lineTo(W * 0.94, y); c.stroke(); }
+      c.strokeStyle = 'rgba(184,148,86,0.15)';
+      c.beginPath(); c.moveTo(W * 0.06, 0); c.lineTo(W * 0.06, H); c.stroke(); break;
     }
     case 'sticky': {
       c.fillStyle = 'rgba(0,0,0,0.05)'; c.fillRect(0, H * 0.94, W, H * 0.06);
@@ -1003,7 +1005,7 @@ function bindTop() {
 function bindCanvas() {
   const wrapEl = document.getElementById('cx-canvas-wrap');
   if (!wrapEl || !canvas) return;
-  const isFree = () => C.settings.pinstyle === 'free';
+  const isFree = () => isFreeMode();
   canvas.addEventListener('mousedown', e => {
     const r = canvas.getBoundingClientRect();
     const px = (e.clientX - r.left) / sPrev, py = (e.clientY - r.top) / sPrev;
@@ -1121,7 +1123,7 @@ function handleRightClick(e) {
   const pub = t.closest('[data-pub]'); if (pub) { C.settings.ratio = pub.dataset.pub; applyRatio(C.settings.ratio); refreshRight(); sizeCanvas(); redraw(); return; }
   const ra = t.closest('[data-ratio]'); if (ra) { C.settings.ratio = ra.dataset.ratio; applyRatio(C.settings.ratio); refreshRight(); sizeCanvas(); redraw(); return; }
   const la = t.closest('[data-layout]'); if (la) { pushUndoC(); const L = LAYOUTS.find(x => x.id === la.dataset.layout); C.settings.layout = L.id; C.settings.cols = L.cols; C.settings.pinstyle = 'grid'; if (participants().length === 0) toast('请先在底部选择要参与拼图的图片'); refreshRight(); loadImages(() => redraw()); return; }
-  const pin = t.closest('[data-pin]'); if (pin) { pushUndoC(); C.settings.pinstyle = pin.dataset.pin; cellSel = null; if (C.settings.pinstyle === 'free') ensureFreeImages(); else if (participants().length === 0) toast('请先在底部选择要参与拼图的图片'); refreshRight(); loadImages(() => redraw()); return; }
+  const pin = t.closest('[data-pin]'); if (pin) { pushUndoC(); C.settings.pinstyle = pin.dataset.pin; cellSel = null; if (isFreeMode()) ensureFreeImages(); else if (participants().length === 0) toast('请先在底部选择要参与拼图的图片'); refreshRight(); loadImages(() => redraw()); return; }
   if (t.id === 'cx-free-reset') { resetFreeImages(); loadImages(() => redraw()); return; }
   const bg = t.closest('[data-bg]'); if (bg) { const b = BG_PRESETS.find(x => x.id === bg.dataset.bg); C.settings.bg = { ...b }; refreshRight(); redraw(); return; }
   const fr = t.closest('[data-frame]'); if (fr) { C.settings.frame = fr.dataset.frame; refreshRight(); redraw(); return; }
@@ -1296,17 +1298,24 @@ function addImageSticker(dataUrl) {
 }
 function delLayer() { const i = (C.layers || []).findIndex(l => l.id === selectedLayerId); if (i < 0) return; pushUndoC(); C.layers.splice(i, 1); selectedLayerId = null; refreshTextStyle(); redraw(); }
 
-// ===== 自由摆放：用图片图层承载 =====
+// 自由摆放/单图成品：用图片图层承载
+function isFreeMode() { return C.settings.pinstyle === 'free' || C.settings.pinstyle === 'single'; }
 function ensureFreeImages() {
   C.layers = C.layers || [];
   const ps = participants();
+  const single = C.settings.pinstyle === 'single';
   const have = new Set(C.layers.filter(l => l.kind === 'image').map(l => l.frameId));
   // 移除已不参与的图片层
   C.layers = C.layers.filter(l => l.kind !== 'image' || ps.find(p => p.id === l.frameId));
   ps.forEach((p, i) => {
     if (have.has(p.id)) return;
-    const col = i % 2, row = Math.floor(i / 2);
-    C.layers.push({ id: 'IMG-' + p.id, kind: 'image', frameId: p.id, xPct: 0.3 + col * 0.4, yPct: 0.28 + row * 0.32, scale: 1, rotate: 0 });
+    if (single) {
+      // 单图成品：居中、稍大，方便用户缩小让背景露出
+      C.layers.push({ id: 'IMG-' + p.id, kind: 'image', frameId: p.id, xPct: 0.5, yPct: 0.5, scale: 1.6, rotate: 0 });
+    } else {
+      const col = i % 2, row = Math.floor(i / 2);
+      C.layers.push({ id: 'IMG-' + p.id, kind: 'image', frameId: p.id, xPct: 0.3 + col * 0.4, yPct: 0.28 + row * 0.32, scale: 1, rotate: 0 });
+    }
   });
 }
 function resetFreeImages() { C.layers = (C.layers || []).filter(l => l.kind !== 'image'); ensureFreeImages(); selectedLayerId = null; }
@@ -1336,7 +1345,7 @@ export function undoCollageExport() {
   const snap = undoStackC.pop();
   loadSnapshot(snap); selectedLayerId = null; cellSel = null; awaitingReplace = false;
   applyRatio(C.settings.ratio); imgCache = {};
-  if (C.settings.pinstyle === 'free') ensureFreeImages();
+  if (isFreeMode()) ensureFreeImages();
   refreshRight(); refreshQueue(); loadImages(() => { sizeCanvas(); redraw(); }); refreshUndoBtn();
   toast('已撤销');
 }
@@ -1344,7 +1353,7 @@ function loadSnapshot(s) { C.items = JSON.parse(JSON.stringify(s.items || [])); 
 function schemeSave() { const sel = document.getElementById('cx-scheme-sel'); const a = getSchemes(); if (sel && sel.value !== '') { a[+sel.value].snap = snapshot(); if (setSchemes(a)) toast('已保存当前拼图'); } else { const name = prompt('拼图工程名称：', '拼图' + (a.length + 1)); if (!name) return; a.push({ name: name.trim(), snap: snapshot() }); if (setSchemes(a)) { toast('已保存当前拼图'); refreshRight(); } } }
 function schemeCopyCurrent() { const a = getSchemes(); const name = prompt('复制为新拼图，名称：', '拼图副本'); if (!name) return; a.push({ name: name.trim(), snap: snapshot() }); if (setSchemes(a)) { toast('已复制为新拼图工程'); refreshRight(); } }
 function schemeDel() { const sel = document.getElementById('cx-scheme-sel'); const a = getSchemes(); if (!sel || sel.value === '') { toast('请先在下拉里选择要删除的拼图工程'); return; } if (!window.confirm('删除该拼图工程？（不影响底部素材）')) return; a.splice(+sel.value, 1); setSchemes(a); toast('已删除'); refreshRight(); }
-function schemeLoad(i) { const a = getSchemes(); if (!a[i]) return; loadSnapshot(a[i].snap); selectedLayerId = null; cellSel = null; awaitingReplace = false; applyRatio(C.settings.ratio); imgCache = {}; if (C.settings.pinstyle === 'free') ensureFreeImages(); refreshRight(); refreshQueue(); loadImages(() => { sizeCanvas(); redraw(); }); toast(`已载入：${a[i].name}`); }
+function schemeLoad(i) { const a = getSchemes(); if (!a[i]) return; loadSnapshot(a[i].snap); selectedLayerId = null; cellSel = null; awaitingReplace = false; applyRatio(C.settings.ratio); imgCache = {}; if (isFreeMode()) ensureFreeImages(); refreshRight(); refreshQueue(); loadImages(() => { sizeCanvas(); redraw(); }); toast(`已载入：${a[i].name}`); }
 function clearItemsState() { C.items.forEach(it => { it.on = false; delete it.offX; delete it.offY; delete it.scale; delete it.imgUrl; }); }
 function newBlank() {
   if (!window.confirm('新建空白拼图？将清空画布内容与参与图片选择（不删除底部素材库）。')) return;
@@ -1375,7 +1384,7 @@ function presetApply() {
   // 套用版式：保留当前已选图片（grid/不规则自动进入图片位；free 用 ensureFreeImages 把当前图铺入）
   C.layers = JSON.parse(JSON.stringify(p.layers || [])).map(normalizeLayer);
   applyRatio(C.settings.ratio);
-  if (C.settings.pinstyle === 'free') ensureFreeImages();
+  if (isFreeMode()) ensureFreeImages();
   selectedLayerId = null; cellSel = null; awaitingReplace = false;
   refreshRight(); refreshQueue(); loadImages(() => { sizeCanvas(); redraw(); });
   const n = participants().length, slots = slotsFor(C.settings.pinstyle, n);
