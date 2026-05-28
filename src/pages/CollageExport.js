@@ -455,7 +455,9 @@ function layerOrderBar() {
   </div></div>`;
 }
 function bgToggleBtn(l) {
-  return `<button class="cx-add ${l.asBg ? 'primary' : ''}" data-bgtoggle="1" style="width:100%;margin-bottom:6px">${l.asBg ? '恢复为浮层' : '置为背景（放到拼图格子下面）'}</button>`;
+  // 已置为背景：不在「成品文字」里管理，提示去左侧「背景图设置」；否则给出「置为背景」按钮
+  if (l.asBg) return `<div class="cx-note" style="margin-bottom:6px">该图已置为背景。请在左侧「拼图设置 → 背景图设置」中调整或「恢复为浮层」。</div>`;
+  return `<button class="cx-add" data-bgtoggle="1" style="width:100%;margin-bottom:6px">置为背景（放到拼图格子下面）</button>`;
 }
 function bgLayer() { return (C.layers || []).find(l => l.asBg) || null; }
 function renderBgPanel() {
@@ -1369,7 +1371,16 @@ function makeZip(files) {
 }
 
 // ===== 局部刷新 =====
-function refreshRight() { const old = document.getElementById('cx-right'); if (!old) return; old.outerHTML = renderRight(); bindRight(); }
+function refreshRight() {
+  const old = document.getElementById('cx-right'); if (!old) return;
+  // 记录右侧两列滚动位置，刷新后恢复，避免操作后跳回顶部
+  const setTop = old.querySelector('.cx-ws-set')?.scrollTop || 0;
+  const textTop = old.querySelector('.cx-ws-text')?.scrollTop || 0;
+  old.outerHTML = renderRight(); bindRight();
+  const neu = document.getElementById('cx-right'); if (!neu) return;
+  const s = neu.querySelector('.cx-ws-set'); if (s) s.scrollTop = setTop;
+  const tx = neu.querySelector('.cx-ws-text'); if (tx) tx.scrollTop = textTop;
+}
 function refreshQueue() { const old = document.getElementById('cx-queue'); if (!old) return; old.outerHTML = renderQueue(); bindQueue(); }
 function refreshTextStyle() { const box = document.getElementById('cx-textstyle'); if (box) box.innerHTML = renderTextStyle(); refreshStickerDel(); }
 function refreshStickerDel() { const acc = document.querySelector('.cx-acc[data-acc="sticker"] .cx-acc-body'); if (acc) acc.innerHTML = renderStickerBlock(); }
