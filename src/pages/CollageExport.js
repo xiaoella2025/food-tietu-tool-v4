@@ -294,10 +294,10 @@ function renderRight() {
           ${sec('layout', '③ 拼图布局', renderLayout())}
           ${sec('pin', '④ 拼图样式', renderPinStyle())}
           ${sec('canvas', '⑤ 画布与边框', renderCanvasBlock())}
-          ${bgLayer() ? sec('bgimg', '⑤·背景图（粘贴/置为背景）', renderBgPanel()) : ''}
-          ${sec('small', '⑥ 小图样式', renderSmall())}
-          ${sec('sticker', '⑦ 贴图素材', renderStickerBlock())}
-          ${sec('export', '⑧ 导出设置', renderExportBlock())}
+          ${sec('bgimg', '⑥ 背景图设置', renderBgPanel())}
+          ${sec('small', '⑦ 小图样式', renderSmall())}
+          ${sec('sticker', '⑧ 贴图素材', renderStickerBlock())}
+          ${sec('export', '⑨ 导出设置', renderExportBlock())}
         </div>
         <div class="cx-ws cx-ws-text">
           <div class="cx-ws-title">成品文字</div>
@@ -461,7 +461,10 @@ function bgToggleBtn(l) {
 }
 function bgLayer() { return (C.layers || []).find(l => l.asBg) || null; }
 function renderBgPanel() {
-  const l = bgLayer(); if (!l) return '';
+  const l = bgLayer();
+  if (!l) return `
+    <div class="cx-block-desc">当前没有背景图。你可以：<br>1. Ctrl+V 粘贴一张图片到画布，再点「置为背景」<br>2. 或先添加图片到画布，再设为背景<br>背景图会放在拼图格子下方。</div>
+    <div class="cx-addrow"><button class="cx-add" data-bgctl="del" disabled>清除背景图</button></div>`;
   const op = l.opacity != null ? l.opacity : 1;
   return `
     <div class="cx-block-desc" style="margin-bottom:6px">这里调整的是背景图在画布里的位置，不是图层顺序。要回普通图层，请点「恢复为浮层」。</div>
