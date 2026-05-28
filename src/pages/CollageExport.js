@@ -176,6 +176,7 @@ export function renderCollageExport({ frames, editResults, editProjects, collage
   editProjectsRef = editProjects || {};
   onToastCb = onToast || null;
   C = collage;
+  if (!C.textDefault) C.textDefault = defaultText();
   imgCache = {};
   selectedLayerId = null;
 
@@ -418,11 +419,18 @@ function renderStep2Body() {
       ${list.length ? `<div class="cx-step2-list">${list.map(x => `<div class="cx-step2-item"><b>${escapeHTML(x.name)}</b>：${escapeHTML(x.body.slice(0, 40))}${x.body.length > 40 ? '…' : ''}</div>`).join('')}</div>` : `<div class="cx-note">第二步「成图编辑」写了正文并保存后，会在此列出，可一键导入。</div>`}
     </div>`;
 }
+// 选中文字时操作该文字；否则操作 C.textDefault（默认/新文字样式）
+function styleTarget() { const l = curLayer(); return (l && l.kind === 'text') ? l : (C.textDefault || (C.textDefault = defaultText())); }
+function isTargetLayer() { const l = curLayer(); return !!(l && l.kind === 'text'); }
 // ③ 文字样式 / 文字格式（只放样式，不含内容/图层/删除）
 function renderStyleOnly() {
-  const l = curLayer();
-  if (!l || l.kind !== 'text') return `<div class="cx-empty">选中文字后可应用文字样式（字号/颜色/描边/背景板/阴影/艺术字等）。</div>`;
+  const l = styleTarget();
+  const head = isTargetLayer() ? '当前文字样式' : '默认新文字样式（添加文字时使用）';
   const col = (v, d) => (typeof v === 'string' && /^#/.test(v)) ? v : d;
+  return `
+    <div class="cx-flabel">${head}</div>` + renderStyleControls(l, col);
+}
+function renderStyleControls(l, col) {
   return `
     <div class="cx-slider2" data-ls="fontSize"><label>字号</label><input type="range" min="16" max="200" step="2" value="${l.fontSize || 48}"><span class="cx-val">${l.fontSize || 48}</span></div>
     <div class="cx-row"><label>颜色</label><input type="color" data-lp="color" value="${col(l.color, '#ffffff')}">
@@ -481,9 +489,14 @@ function bgToggleBtn(l) {
 function bgLayer() { return (C.layers || []).find(l => l.asBg) || null; }
 function renderBgPanel() {
   const l = bgLayer();
-  if (!l) return `
-    <div class="cx-block-desc">当前没有背景图。你可以：<br>1. Ctrl+V 粘贴一张图片到画布，再点「置为背景」<br>2. 或先添加图片到画布，再设为背景<br>背景图会放在拼图格子下方。</div>
-    <div class="cx-addrow"><button class="cx-add" data-bgctl="del" disabled>清除背景图</button></div>`;
+  if (!l) {
+    const sel = curLayer();
+    const canSetBg = sel && (sel.kind === 'image' || sel.kind === 'sticker') && !sel.asBg;
+    return `
+      <div class="cx-block-desc">当前没有背景图。你可以：<br>1. Ctrl+V 粘贴一张图片到画布，再点「置为背景」<br>2. 或先添加图片到画布，再设为背景<br>背景图会放在拼图格子下方。</div>
+      ${canSetBg ? `<button class="cx-add primary" data-bgtoggle="1" style="width:100%;margin-top:6px">把当前选中图片设为背景</button>` : ''}
+      <div class="cx-addrow"><button class="cx-add" data-bgctl="del" disabled>清除背景图</button></div>`;
+  }
   const op = l.opacity != null ? l.opacity : 1;
   return `
     <div class="cx-block-desc" style="margin-bottom:6px">这里调整的是背景图在画布里的位置，不是图层顺序。要回普通图层，请点「恢复为浮层」。</div>
@@ -912,7 +925,7 @@ function bindCanvas() {
       const changed = selectedLayerId !== hit.id; selectedLayerId = hit.id; cellSel = null;
       pushUndoC();
       drag = { active: true, id: hit.id, ox: px - hit.xPct * designW, oy: py - hit.yPct * designH };
-      if (changed) refreshTextStyle();
+      if (changed) { refreshTextStyle(); refreshBgPanel(); }
       redraw(); e.preventDefault(); return;
     }
     // 命中格子（规则/不规则模式）→ 选中并可平移小图
@@ -926,7 +939,7 @@ function bindCanvas() {
         refreshTextStyle(); refreshPinZoom(); redraw(); e.preventDefault(); return;
       }
     }
-    if (selectedLayerId || cellSel) { selectedLayerId = null; cellSel = null; refreshTextStyle(); refreshPinZoom(); redraw(); }
+    if (selectedLayerId || cellSel) { selectedLayerId = null; cellSel = null; refreshTextStyle(); refreshBgPanel(); refreshPinZoom(); redraw(); }
   });
   document.addEventListener('mousemove', onMove);
   document.addEventListener('mouseup', onUp);
@@ -1053,10 +1066,10 @@ function handleRightClick(e) {
   if (t.id === 'cx-copy-pubbody') { const text = (C.copyBody || '').trim(); if (!text) { toast('正文为空'); return; } if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => toast('已复制正文')).catch(() => fallbackCopy(text)); else fallbackCopy(text); return; }
   if (t.id === 'cx-clear-pubbody') { if (!(C.copyBody || '').trim()) return; if (!window.confirm('清空发布正文？')) return; C.copyBody = ''; const ta = document.getElementById('cx-pubbody-text'); if (ta) ta.value = ''; toast('已清空正文'); return; }
   const at = t.closest('[data-addtext]'); if (at) { addText(at.dataset.addtext); return; }
-  const al = t.closest('[data-align]'); if (al) { const l = curLayer(); if (l) { l.align = al.dataset.align; redraw(); refreshTextStyle(); } return; }
-  const sw = t.closest('[data-colorfor]'); if (sw) { const l = curLayer(); if (l) { l[sw.dataset.colorfor] = sw.dataset.color; redraw(); refreshTextStyle(); } return; }
-  const rb = t.closest('[data-rot]'); if (rb) { const l = curLayer(); if (!l) return; const d = +rb.dataset.rot; let nr = d === 0 ? 0 : (l.rotate || 0) + d; nr = ((nr + 180) % 360 + 360) % 360 - 180; l.rotate = nr; redraw(); refreshTextStyle(); return; }
-  const art = t.closest('[data-art]'); if (art) { const l = curLayer(); if (!l || l.kind !== 'text') { toast('请先选中一段文字'); return; } Object.assign(l, ART_PRESETS[art.dataset.art].style); redraw(); refreshTextStyle(); return; }
+  const al = t.closest('[data-align]'); if (al) { const tg = styleTarget(); tg.align = al.dataset.align; if (isTargetLayer()) redraw(); refreshTextStyle(); return; }
+  const sw = t.closest('[data-colorfor]'); if (sw) { const tg = styleTarget(); tg[sw.dataset.colorfor] = sw.dataset.color; if (isTargetLayer()) redraw(); refreshTextStyle(); return; }
+  const rb = t.closest('[data-rot]'); if (rb) { const tg = styleTarget(); const d = +rb.dataset.rot; let nr = d === 0 ? 0 : (tg.rotate || 0) + d; nr = ((nr + 180) % 360 + 360) % 360 - 180; tg.rotate = nr; if (isTargetLayer()) redraw(); refreshTextStyle(); return; }
+  const art = t.closest('[data-art]'); if (art) { const tg = styleTarget(); Object.assign(tg, ART_PRESETS[art.dataset.art].style); if (isTargetLayer()) redraw(); refreshTextStyle(); return; }
   const stk = t.closest('[data-stk]'); if (stk) { addSticker(+stk.dataset.stk); return; }
   if (t.closest('[data-dellayer]')) { delLayer(); return; }
   const fmt = t.closest('[data-fmt]'); if (fmt) { C.settings.exp.format = fmt.dataset.fmt; refreshRight(); return; }
@@ -1080,9 +1093,9 @@ function handleRightInput(e) {
   if (t.dataset.zip) { const map = { collage: 'zipCollage', singles: 'zipSingles', copy: 'zipCopy' }; C.settings.exp[map[t.dataset.zip]] = t.checked; return; }
   // 文字样式
   if (t.id === 'cx-seltext') { const l = curLayer(); if (l) { l.text = t.value; redraw(); } return; }
-  const lp = t.dataset.lp; if (lp) { const l = curLayer(); if (l) { l[lp] = t.type === 'checkbox' ? t.checked : t.value; redraw(); } return; }
-  const lpn = t.dataset.lpn; if (lpn) { const l = curLayer(); if (l) { let v = parseFloat(t.value) || 0; if (lpn === 'rotate') v = Math.max(-180, Math.min(180, v)); l[lpn] = v; redraw(); } return; }
-  const ls = t.closest('[data-ls]'); if (ls) { const l = curLayer(); if (l) { const k = ls.dataset.ls; const v = parseFloat(t.value); if (k === 'lineHeightX10') l.lineHeight = v / 10; else l[k] = v; const sp = ls.querySelector('.cx-val'); if (sp) sp.textContent = Math.round(v); redraw(); } return; }
+  const lp = t.dataset.lp; if (lp) { const tg = styleTarget(); tg[lp] = t.type === 'checkbox' ? t.checked : t.value; if (isTargetLayer()) redraw(); return; }
+  const lpn = t.dataset.lpn; if (lpn) { const tg = styleTarget(); let v = parseFloat(t.value) || 0; if (lpn === 'rotate') v = Math.max(-180, Math.min(180, v)); tg[lpn] = v; if (isTargetLayer()) redraw(); return; }
+  const ls = t.closest('[data-ls]'); if (ls) { const tg = styleTarget(); const k = ls.dataset.ls; const v = parseFloat(t.value); if (k === 'lineHeightX10') tg.lineHeight = v / 10; else tg[k] = v; const sp = ls.querySelector('.cx-val'); if (sp) sp.textContent = Math.round(v); if (isTargetLayer()) redraw(); return; }
 }
 function setNum(k, v) {
   if (k === 'cols') C.settings.cols = v;
@@ -1171,8 +1184,9 @@ function addText(kind) {
   C.layers = C.layers || [];
   const map = { title: { text: '总标题', fontSize: 84 }, subtitle: { text: '副标题', fontSize: 52 }, body: { text: '说明文字', fontSize: 38, strokeOn: false, bgOn: true }, tag: { text: '标签', fontSize: 40, bgOn: true, bgColor: '#d42a2a', color: '#fff200', strokeOn: false } };
   const yPos = { title: 0.08, subtitle: 0.2, body: 0.85, tag: 0.04 };
-  const l = { id: 'T-' + Date.now() + Math.random().toString(36).slice(2, 5), kind: 'text', ...defaultText(), ...map[kind], xPct: 0.1, yPct: yPos[kind] || 0.1 + (C.layers.length * 0.05) };
-  C.layers.push(l); selectedLayerId = l.id; refreshTextStyle(); redraw();
+  // 合并默认新文字样式(C.textDefault)，让 ③ 文字样式未选中时的设置对新文字生效
+  const l = { id: 'T-' + Date.now() + Math.random().toString(36).slice(2, 5), kind: 'text', ...defaultText(), ...(C.textDefault || {}), ...map[kind], xPct: 0.1, yPct: yPos[kind] || 0.1 + (C.layers.length * 0.05) };
+  C.layers.push(l); selectedLayerId = l.id; refreshTextStyle(); refreshBgPanel(); redraw();
 }
 function addSticker(i) {
   const s = STICKERS[i]; if (!s) return; pushUndoC(); C.layers = C.layers || [];
@@ -1219,7 +1233,7 @@ function setSchemes(a) { return safeSet('cxSchemes', a); }
 function getPresets() { try { return JSON.parse(localStorage.getItem('cxPresets') || '[]'); } catch { return []; } }
 function setPresets(a) { return safeSet('cxPresets', a); }
 // 工程快照：只存结构 + frameId（不重复存参与图片 dataUrl）；贴图上传图保留 dataUrl
-function snapshot() { return JSON.parse(JSON.stringify({ items: C.items, layers: (C.layers || []).map(l => { const { _box, ...r } = l; return r; }), settings: C.settings, copyBody: C.copyBody || '' })); }
+function snapshot() { return JSON.parse(JSON.stringify({ items: C.items, layers: (C.layers || []).map(l => { const { _box, ...r } = l; return r; }), settings: C.settings, copyBody: C.copyBody || '', textDefault: C.textDefault || defaultText() })); }
 // ===== 撤销 =====
 function pushUndoC() { undoStackC.push(snapshot()); if (undoStackC.length > 10) undoStackC.shift(); refreshUndoBtn(); }
 function refreshUndoBtn() { const b = document.getElementById('cx-undo'); if (b) b.disabled = undoStackC.length === 0; }
@@ -1232,7 +1246,7 @@ export function undoCollageExport() {
   refreshRight(); refreshQueue(); loadImages(() => { sizeCanvas(); redraw(); }); refreshUndoBtn();
   toast('已撤销');
 }
-function loadSnapshot(s) { C.items = JSON.parse(JSON.stringify(s.items || [])); C.layers = (JSON.parse(JSON.stringify(s.layers || []))).map(normalizeLayer); C.settings = Object.assign(defaultSettings(), JSON.parse(JSON.stringify(s.settings || {}))); if (!C.settings.small) C.settings.small = defaultSettings().small; C.copyBody = s.copyBody || ''; }
+function loadSnapshot(s) { C.items = JSON.parse(JSON.stringify(s.items || [])); C.layers = (JSON.parse(JSON.stringify(s.layers || []))).map(normalizeLayer); C.settings = Object.assign(defaultSettings(), JSON.parse(JSON.stringify(s.settings || {}))); if (!C.settings.small) C.settings.small = defaultSettings().small; C.copyBody = s.copyBody || ''; C.textDefault = s.textDefault || defaultText(); }
 function schemeSave() { const sel = document.getElementById('cx-scheme-sel'); const a = getSchemes(); if (sel && sel.value !== '') { a[+sel.value].snap = snapshot(); if (setSchemes(a)) toast('已保存当前拼图'); } else { const name = prompt('拼图工程名称：', '拼图' + (a.length + 1)); if (!name) return; a.push({ name: name.trim(), snap: snapshot() }); if (setSchemes(a)) { toast('已保存当前拼图'); refreshRight(); } } }
 function schemeCopyCurrent() { const a = getSchemes(); const name = prompt('复制为新拼图，名称：', '拼图副本'); if (!name) return; a.push({ name: name.trim(), snap: snapshot() }); if (setSchemes(a)) { toast('已复制为新拼图工程'); refreshRight(); } }
 function schemeDel() { const sel = document.getElementById('cx-scheme-sel'); const a = getSchemes(); if (!sel || sel.value === '') { toast('请先在下拉里选择要删除的拼图工程'); return; } if (!window.confirm('删除该拼图工程？（不影响底部素材）')) return; a.splice(+sel.value, 1); setSchemes(a); toast('已删除'); refreshRight(); }
