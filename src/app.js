@@ -1,6 +1,6 @@
 import { renderImageEditPage, initImageEditPage, PRESETS } from './pages/ImageEdit.js';
 import { renderTextOverlayPage, initTextOverlayPage } from './pages/TextOverlay.js';
-import { renderEditWorkbench, initEditWorkbench, undoWorkbench, saveCurrentWorkbench, exportCurrentWorkbenchImage } from './pages/EditWorkbench.js';
+import { renderEditWorkbench, initEditWorkbench, undoWorkbench, saveCurrentWorkbench, exportCurrentWorkbenchImage, copyCurrentWorkbenchBody, exportCurrentWorkbenchBody } from './pages/EditWorkbench.js';
 import { renderCollageExport, initCollageExport } from './pages/CollageExport.js';
 
 // ===== GLOBAL STATE =====
@@ -161,6 +161,8 @@ function renderTopbar() {
       <div class="topbar-actions">
         ${state.currentPage === 'workbench' ? `
           <button id="btn-wb-undo" class="wb-top-btn">↶ 撤销</button>
+          <button id="btn-wb-copybody" class="wb-top-btn">📋 复制正文</button>
+          <button id="btn-wb-exportbody" class="wb-top-btn">📄 导出正文txt</button>
           <button id="btn-wb-export" class="wb-top-btn">⬇ 导出单图</button>
           <button id="btn-wb-save" class="primary wb-top-btn">💾 保存当前</button>
         ` : `<span style="font-size:12px;color:var(--color-text-muted);font-weight:700;">美食养生贴图工具 V1</span>`}
@@ -431,6 +433,8 @@ function bindWorkbenchPage() {
   initEditWorkbench();
   document.getElementById('btn-wb-undo')?.addEventListener('click', () => undoWorkbench());
   document.getElementById('btn-wb-export')?.addEventListener('click', () => exportCurrentWorkbenchImage());
+  document.getElementById('btn-wb-copybody')?.addEventListener('click', () => copyCurrentWorkbenchBody());
+  document.getElementById('btn-wb-exportbody')?.addEventListener('click', () => exportCurrentWorkbenchBody());
   document.getElementById('btn-wb-save')?.addEventListener('click', () => saveCurrentWorkbench());
 }
 

@@ -1553,6 +1553,27 @@ export function exportCurrentWorkbenchImage() {
     showToast('已导出当前单图');
   });
 }
+// 复制当前图正文（发布文案，不上图）
+export function copyCurrentWorkbenchBody() {
+  const body = (project().scripts.body || '').trim();
+  if (!body) { showToast('当前正文为空'); return; }
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(body).then(() => showToast('已复制正文')).catch(() => fallbackCopyWb(body));
+  else fallbackCopyWb(body);
+}
+function fallbackCopyWb(t) { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); showToast('已复制正文'); } catch (e) { showToast('复制失败'); } ta.remove(); }
+// 导出当前图正文为 txt
+export function exportCurrentWorkbenchBody() {
+  const frame = currentFrame();
+  const body = (project().scripts.body || '').trim();
+  if (!body) { showToast('当前正文为空'); return; }
+  const name = (frame && frame.materialName) || ('素材' + Date.now());
+  const blob = new Blob([body], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `${name}_正文.txt`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  showToast('已导出正文 txt');
+}
 
 // ===== 候选标题（本地）=====
 function buildTitleCandidates(keyword) {
