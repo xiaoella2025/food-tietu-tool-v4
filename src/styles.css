@@ -2020,3 +2020,8 @@ textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(
 .cx-step2-list { max-height: 120px; overflow-y: auto; margin-bottom: 6px; }
 .cx-step2-item { font-size: 11px; line-height: 1.5; color: var(--color-text-secondary); padding: 3px 0; border-bottom: 1px dashed #e0e8f8; }
 .cx-step2-item b { color: var(--color-text); }
+
+/* 拼图导出右侧信息结构整理 */
+.cx-block-h { font-size: 13px; font-weight: 800; color: var(--color-text); margin: 10px 2px 6px; }
+.cx-block-h:first-of-type { margin-top: 4px; }
+.cx-pubbody #cx-pubbody-text { width: 100%; min-height: 140px; resize: vertical; box-sizing: border-box; }
