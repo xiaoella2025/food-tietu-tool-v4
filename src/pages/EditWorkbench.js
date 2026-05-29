@@ -125,6 +125,9 @@ let undoStack = [];
 let accordion = { template: true, title: true, steps: false, body: false, style: true, art: false };
 let tplBringText = true;   // 成图模板应用方式：true=带入模板文字，false=仅套样式与位置
 
+let batchSelectedIds = new Set();
+let batchRatio = '原图';
+
 // ===== 入口 =====
 export function renderEditWorkbench({ frames, currentFrameId: cid, projects, results, onSwitchFrame, onSaveResult, onDeleteFrame }) {
   framesRef = frames || [];
@@ -140,6 +143,7 @@ export function renderEditWorkbench({ frames, currentFrameId: cid, projects, res
   cropRect = null; wmRect = null;
   resetAdj();
   undoStack = [];
+  batchSelectedIds = new Set();
   ensureProject(currentFrameId);
 
   return `
@@ -475,9 +479,32 @@ function renderArtBlock() {
 }
 
 // ===== 底部队列 =====
+function renderBatchBar() {
+  const sel = batchSelectedIds.size;
+  const ratios = ['原图', '1:1', '3:4', '4:3', '9:16'];
+  return `
+    <div class="wb-batch-bar" id="wb-batch-bar">
+      <div class="wb-batch-row">
+        <button class="wb-batch-btn" id="wb-sel-all">全选</button>
+        <button class="wb-batch-btn" id="wb-sel-none">取消</button>
+        <span class="wb-batch-count">${sel > 0 ? `已选 ${sel} 张` : '未选图片'}</span>
+        <span class="wb-batch-spacer"></span>
+        <button class="wb-batch-btn primary" id="wb-batch-export-png" ${sel === 0 ? 'disabled' : ''}>批量导出 PNG</button>
+        <button class="wb-batch-btn" id="wb-batch-export-zip" ${sel === 0 ? 'disabled' : ''}>打包 ZIP</button>
+      </div>
+      <div class="wb-batch-row">
+        <span class="wb-batch-label">改比例：</span>
+        ${ratios.map(r => `<button class="wb-batch-ratio-btn${batchRatio === r ? ' active' : ''}" data-batch-ratio="${r}">${r}</button>`).join('')}
+        <button class="wb-batch-btn primary" id="wb-batch-apply-ratio" ${sel === 0 ? 'disabled' : ''}>应用到已选</button>
+      </div>
+    </div>
+  `;
+}
+
 function renderQueue() {
   return `
     <div class="wb-queue" id="wb-queue">
+      ${renderBatchBar()}
       <div class="wb-queue-scroll">
         ${framesRef.map((f, i) => renderQueueCard(f, i)).join('')}
       </div>
@@ -492,8 +519,10 @@ function renderQueueCard(f, idx) {
   const hasText = p && p.layers && p.layers.length > 0;
   const saved = p && p.saved && resultsRef[f.id];
   const name = f.materialName || ('素材' + String(idx + 1).padStart(4, '0'));
+  const checked = batchSelectedIds.has(f.id) ? 'checked' : '';
   return `
     <div class="wb-qcard ${f.id === currentFrameId ? 'active' : ''}" data-frame-id="${f.id}">
+      <label class="wb-qcheck" title="选中批量处理"><input type="checkbox" data-frame-check="${f.id}" ${checked}></label>
       <button class="wb-qdel" data-frame-del="${f.id}" title="删除这张图片">×</button>
       <div class="wb-qthumb"><img src="${thumb}" draggable="false" alt="${escapeAttr(name)}"></div>
       <div class="wb-qname">${escapeHTML(name)}</div>
@@ -1462,9 +1491,28 @@ function applyTemplateFromSelect() {
 
 // ===== 队列事件 =====
 function bindQueue() {
-  document.getElementById('wb-queue')?.addEventListener('click', e => {
+  const qel = document.getElementById('wb-queue');
+  if (!qel) return;
+  qel.addEventListener('change', e => {
+    const cb = e.target.closest('[data-frame-check]');
+    if (cb) {
+      const id = cb.dataset.frameCheck;
+      if (e.target.checked) batchSelectedIds.add(id);
+      else batchSelectedIds.delete(id);
+      refreshBatchBar();
+    }
+  });
+  qel.addEventListener('click', e => {
+    if (e.target.closest('.wb-qcheck')) { e.stopPropagation(); return; }
     const del = e.target.closest('[data-frame-del]');
     if (del) { e.stopPropagation(); deleteFrame(del.dataset.frameDel); return; }
+    if (e.target.id === 'wb-sel-all') { framesRef.forEach(f => batchSelectedIds.add(f.id)); refreshBatchBar(); refreshQueueChecks(); return; }
+    if (e.target.id === 'wb-sel-none') { batchSelectedIds.clear(); refreshBatchBar(); refreshQueueChecks(); return; }
+    if (e.target.id === 'wb-batch-apply-ratio') { batchApplyRatio(); return; }
+    if (e.target.id === 'wb-batch-export-png') { batchExportPNGs(); return; }
+    if (e.target.id === 'wb-batch-export-zip') { batchExportZip(); return; }
+    const ratioBtn = e.target.closest('[data-batch-ratio]');
+    if (ratioBtn) { batchRatio = ratioBtn.dataset.batchRatio; refreshBatchBar(); return; }
     const card = e.target.closest('.wb-qcard');
     if (!card) return;
     const id = card.dataset.frameId;
@@ -1474,6 +1522,7 @@ function bindQueue() {
 }
 function deleteFrame(id) {
   if (!window.confirm('确定删除这张图片吗？删除后该图的文字、处理结果和保存状态也会一起删除。')) return;
+  batchSelectedIds.delete(id);
   commitInlineEdit();
   const idx = framesRef.findIndex(f => f.id === id);
   let newCurrent = currentFrameId;
@@ -1584,6 +1633,160 @@ export function exportCurrentWorkbenchBody() {
   showToast('已导出正文 txt');
 }
 
+// ===== 批量处理 =====
+function composeFrame(frameId, cb) {
+  const frame = framesRef.find(f => f.id === frameId);
+  const p = ensureProject(frameId);
+  if (!frame || !p) { cb && cb(null); return; }
+  const img = new Image();
+  img.onload = () => {
+    const W = img.naturalWidth, H = img.naturalHeight;
+    const out = document.createElement('canvas');
+    out.width = W; out.height = H;
+    const oc = out.getContext('2d');
+    oc.imageSmoothingEnabled = true; oc.imageSmoothingQuality = 'high';
+    oc.drawImage(img, 0, 0, W, H);
+    (p.layers || []).forEach(l => drawLayer(oc, l, W, H, 1));
+    cb && cb(out.toDataURL('image/png'), frame, p);
+  };
+  img.onerror = () => { cb && cb(null); };
+  img.src = p.baseDataUrl || frame.sourceDataUrl;
+}
+
+function applyRatioWithPadWb(frameId, ratio, padColor, cb) {
+  const frame = framesRef.find(f => f.id === frameId);
+  const p = ensureProject(frameId);
+  if (!frame || !p) { cb && cb(false); return; }
+  const src = p.baseDataUrl || frame.sourceDataUrl;
+  if (!src) { cb && cb(false); return; }
+  const img = new Image();
+  img.onload = () => {
+    const srcW = img.naturalWidth, srcH = img.naturalHeight;
+    let newW = srcW, newH = srcH;
+    if (ratio !== '原图') {
+      const [rx, ry] = ratio.split(':').map(Number);
+      const targetAR = rx / ry;
+      const srcAR = srcW / srcH;
+      if (Math.abs(srcAR - targetAR) > 0.005) {
+        if (srcAR > targetAR) { newW = srcW; newH = Math.round(srcW / targetAR); }
+        else { newH = srcH; newW = Math.round(srcH * targetAR); }
+      }
+    }
+    if (newW === srcW && newH === srcH) { cb && cb(true); return; }
+    const out = document.createElement('canvas');
+    out.width = newW; out.height = newH;
+    const oc = out.getContext('2d');
+    oc.imageSmoothingEnabled = true; oc.imageSmoothingQuality = 'high';
+    oc.fillStyle = padColor || '#ffffff';
+    oc.fillRect(0, 0, newW, newH);
+    oc.drawImage(img, Math.round((newW - srcW) / 2), Math.round((newH - srcH) / 2), srcW, srcH);
+    p.baseDataUrl = out.toDataURL('image/png');
+    p.processed = true;
+    cb && cb(true);
+  };
+  img.onerror = () => { cb && cb(false); };
+  img.src = src;
+}
+
+function batchApplyRatio() {
+  const ids = [...batchSelectedIds].filter(id => framesRef.find(f => f.id === id));
+  if (ids.length === 0) { showToast('请先选择图片'); return; }
+  if (batchRatio === '原图') { showToast('当前选的是"原图"，无需改比例'); return; }
+  showToast(`正在处理 ${ids.length} 张图片...`);
+  let done = 0, i = 0;
+  function next() {
+    if (i >= ids.length) {
+      showToast(`已为 ${done} 张图片设为 ${batchRatio} 比例`);
+      if (ids.includes(currentFrameId)) loadBase(() => { sizeCanvas(); drawAll(); renderHandles(); });
+      refreshQueue();
+      return;
+    }
+    const id = ids[i++];
+    applyRatioWithPadWb(id, batchRatio, '#ffffff', ok => { if (ok) done++; next(); });
+  }
+  next();
+}
+
+function batchExportPNGs() {
+  const ids = [...batchSelectedIds].filter(id => framesRef.find(f => f.id === id));
+  if (ids.length === 0) { showToast('请先选择要导出的图片'); return; }
+  showToast(`正在导出 ${ids.length} 张...`);
+  let i = 0;
+  function next() {
+    if (i >= ids.length) { showToast(`已导出 ${ids.length} 张图片`); return; }
+    const id = ids[i++];
+    const idx = framesRef.findIndex(f => f.id === id);
+    composeFrame(id, dataUrl => {
+      if (dataUrl) {
+        const a = document.createElement('a');
+        a.href = dataUrl; a.download = `image-${String(idx + 1).padStart(3, '0')}.png`;
+        document.body.appendChild(a); a.click(); a.remove();
+      }
+      setTimeout(next, 120);
+    });
+  }
+  next();
+}
+
+function batchExportZip() {
+  const ids = [...batchSelectedIds].filter(id => framesRef.find(f => f.id === id));
+  if (ids.length === 0) { showToast('请先选择要导出的图片'); return; }
+  showToast(`正在合成 ${ids.length} 张图片...`);
+  const files = [];
+  let i = 0;
+  function next() {
+    if (i >= ids.length) {
+      if (files.length === 0) { showToast('没有可打包的图片'); return; }
+      const zip = makeZipWb(files);
+      const blob = new Blob([zip], { type: 'application/zip' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `成图_批量导出_${Date.now()}.zip`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 3000);
+      showToast(`已打包 ${files.length} 张图片`);
+      return;
+    }
+    const id = ids[i++];
+    const idx = framesRef.findIndex(f => f.id === id);
+    composeFrame(id, dataUrl => {
+      if (dataUrl) files.push({ name: `image-${String(idx + 1).padStart(3, '0')}.png`, data: dataUrlToBytesWb(dataUrl) });
+      next();
+    });
+  }
+  next();
+}
+
+// ===== ZIP 工具（批量导出用）=====
+function dataUrlToBytesWb(dataUrl) { const b64 = dataUrl.split(',')[1]; const bin = atob(b64); const arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); return arr; }
+const CRC_TABLE_WB = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32Wb(bytes) { let c = 0xFFFFFFFF; for (let i = 0; i < bytes.length; i++) c = CRC_TABLE_WB[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function makeZipWb(files) {
+  const enc = new TextEncoder();
+  const locals = [], centrals = []; let offset = 0;
+  files.forEach(f => {
+    const name = enc.encode(f.name), data = f.data, crc = crc32Wb(data);
+    const lh = new Uint8Array(30 + name.length); const dv = new DataView(lh.buffer);
+    dv.setUint32(0, 0x04034b50, true); dv.setUint16(4, 20, true); dv.setUint16(6, 0, true); dv.setUint16(8, 0, true);
+    dv.setUint16(10, 0, true); dv.setUint16(12, 0, true); dv.setUint32(14, crc, true); dv.setUint32(18, data.length, true); dv.setUint32(22, data.length, true);
+    dv.setUint16(26, name.length, true); dv.setUint16(28, 0, true); lh.set(name, 30);
+    locals.push(lh, data);
+    const ch = new Uint8Array(46 + name.length); const cv = new DataView(ch.buffer);
+    cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true); cv.setUint16(8, 0, true); cv.setUint16(10, 0, true);
+    cv.setUint16(12, 0, true); cv.setUint16(14, 0, true); cv.setUint32(16, crc, true); cv.setUint32(20, data.length, true); cv.setUint32(24, data.length, true);
+    cv.setUint16(28, name.length, true); cv.setUint32(42, offset, true); ch.set(name, 46);
+    centrals.push(ch);
+    offset += lh.length + data.length;
+  });
+  const cdSize = centrals.reduce((s, a) => s + a.length, 0); const cdOffset = offset;
+  const end = new Uint8Array(22); const ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true); ev.setUint16(8, files.length, true); ev.setUint16(10, files.length, true); ev.setUint32(12, cdSize, true); ev.setUint32(16, cdOffset, true);
+  const parts = [...locals, ...centrals, end];
+  let total = 0; parts.forEach(p => total += p.length);
+  const out = new Uint8Array(total); let pos = 0; parts.forEach(p => { out.set(p, pos); pos += p.length; });
+  return out;
+}
+
 // ===== 候选标题（本地）=====
 function buildTitleCandidates(keyword) {
   const k = (keyword || '').trim();
@@ -1635,6 +1838,18 @@ function refreshQueue() {
   if (!old) return;
   old.outerHTML = renderQueue();
   bindQueue();
+}
+function refreshBatchBar() {
+  const bar = document.getElementById('wb-batch-bar');
+  if (!bar) { refreshQueue(); return; }
+  const tmp = document.createElement('div');
+  tmp.innerHTML = renderBatchBar();
+  bar.replaceWith(tmp.firstElementChild);
+}
+function refreshQueueChecks() {
+  document.querySelectorAll('[data-frame-check]').forEach(el => {
+    el.checked = batchSelectedIds.has(el.dataset.frameCheck);
+  });
 }
 function refreshQueueStatus() { updateCurrentCardBadges(); }
 // 只更新当前卡片的状态角标，避免每次微调都重渲染整条队列（含大缩略图）
