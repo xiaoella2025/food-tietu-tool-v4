@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>管理员生成试用码 — 美食养生贴图工具</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #f0f5ff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .box { background: #fff; border-radius: 18px; padding: 40px 36px 32px; width: 480px; max-width: 100%; box-shadow: 0 12px 40px rgba(29,95,231,0.13); }
+  h1 { font-size: 20px; font-weight: 900; color: #0d1f3c; margin-bottom: 6px; }
+  .sub { font-size: 12px; color: #8096b8; margin-bottom: 28px; }
+  label { display: block; font-size: 13px; font-weight: 700; color: #0d1f3c; margin-bottom: 6px; }
+  input[type=text], input[type=date] {
+    width: 100%; height: 42px; padding: 0 12px; border: 2px solid #c8d8f8;
+    border-radius: 9px; font-size: 14px; outline: none; transition: border-color 0.15s;
+    margin-bottom: 18px;
+  }
+  input:focus { border-color: #1d5fe7; }
+  .row { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .pill {
+    flex: 1 0 auto; height: 38px; border-radius: 9px; border: 2px solid #c8d8f8;
+    background: #f5f8ff; color: #1d5fe7; font-size: 13px; font-weight: 700; cursor: pointer;
+    transition: all 0.12s; white-space: nowrap; padding: 0 14px;
+  }
+  .pill:hover, .pill.active { background: #1d5fe7; color: #fff; border-color: #1d5fe7; }
+  .sep { height: 1px; background: #e8edf8; margin: 6px 0 22px; }
+  .gen-btn {
+    width: 100%; height: 48px; border-radius: 12px; background: #1d5fe7; color: #fff;
+    font-size: 16px; font-weight: 900; border: none; cursor: pointer; letter-spacing: 0.1em;
+    transition: background 0.15s;
+  }
+  .gen-btn:hover { background: #1352d8; }
+  .result { display: none; margin-top: 22px; }
+  .result-label { font-size: 13px; font-weight: 700; color: #0d1f3c; margin-bottom: 8px; }
+  .result-code {
+    background: #f0f5ff; border: 2px solid #c8d8f8; border-radius: 10px;
+    padding: 12px 14px; font-family: monospace; font-size: 13px; word-break: break-all;
+    color: #0d1f3c; letter-spacing: 0.03em; line-height: 1.6; min-height: 56px;
+    user-select: all;
+  }
+  .copy-btn {
+    width: 100%; height: 40px; margin-top: 10px; border-radius: 9px;
+    background: #e8f0fe; color: #1d5fe7; font-size: 14px; font-weight: 800;
+    border: 2px solid #c8d8f8; cursor: pointer; transition: all 0.12s;
+  }
+  .copy-btn:hover { background: #1d5fe7; color: #fff; border-color: #1d5fe7; }
+  .info { font-size: 12px; color: #8096b8; margin-top: 8px; }
+  .warn { font-size: 11px; color: #d42a2a; background: #fff5f5; border: 1px solid #f8c8c8; border-radius: 8px; padding: 8px 12px; margin-top: 20px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>管理员生成试用码</h1>
+  <div class="sub">美食养生贴图工具 · 仅限管理员使用 · 不要发给助理</div>
+
+  <label>助理姓名</label>
+  <input type="text" id="inp-name" placeholder="输入助理姓名，例如：小红" maxlength="20">
+
+  <label>有效期</label>
+  <div class="row">
+    <button class="pill" data-days="3">3 天</button>
+    <button class="pill active" data-days="7">7 天</button>
+    <button class="pill" data-days="15">15 天</button>
+    <button class="pill" data-days="30">30 天</button>
+  </div>
+
+  <label>或自定义到期日期</label>
+  <input type="date" id="inp-date" min="">
+
+  <div class="sep"></div>
+  <button class="gen-btn" id="gen-btn">生 成 试 用 码</button>
+
+  <div class="result" id="result">
+    <div class="result-label">试用码（发给助理，可全选复制）</div>
+    <div class="result-code" id="result-code"></div>
+    <button class="copy-btn" id="copy-btn">📋 一键复制试用码</button>
+    <div class="info" id="result-info"></div>
+  </div>
+
+  <div class="warn">⚠️ 本工具只给管理员使用，请不要放进助理试用包。<br>试用码有效期到期后自动失效，无需手动撤销。</div>
+</div>
+
+<script>
+// 与 src/license.js 保持相同的密钥和算法
+const SECRET = 'FoodTieTu-V1-2026-qX9mL3kN7p-XiaoHong';
+
+function b64urlEncode(str) {
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+async function hmac16Hex(payloadB64, secret) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw', enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false, ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(payloadB64));
+  return Array.from(new Uint8Array(sig).slice(0, 16))
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function generateLicense(name, expireDateStr) {
+  const payload = { n: name, e: expireDateStr, r: Math.random().toString(36).slice(2, 10) };
+  const payloadB64 = b64urlEncode(JSON.stringify(payload));
+  const sig = await hmac16Hex(payloadB64, SECRET);
+  return `${payloadB64}.${sig}`;
+}
+
+// 默认选 7 天
+let selectedDays = 7;
+const pillBtns = document.querySelectorAll('.pill[data-days]');
+const dateInp = document.getElementById('inp-date');
+const today = new Date();
+
+// 设置日期输入的最小值为今天
+dateInp.min = today.toISOString().slice(0, 10);
+
+pillBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    pillBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedDays = parseInt(btn.dataset.days);
+    dateInp.value = ''; // 清空自定义日期
+  });
+});
+
+dateInp.addEventListener('change', () => {
+  if (dateInp.value) {
+    pillBtns.forEach(b => b.classList.remove('active'));
+    selectedDays = 0;
+  }
+});
+
+function getExpireDate() {
+  if (dateInp.value) return dateInp.value;
+  const d = new Date();
+  d.setDate(d.getDate() + selectedDays);
+  return d.toISOString().slice(0, 10);
+}
+
+document.getElementById('gen-btn').addEventListener('click', async () => {
+  const name = document.getElementById('inp-name').value.trim();
+  if (!name) { alert('请输入助理姓名'); return; }
+  const expireDate = getExpireDate();
+  const code = await generateLicense(name, expireDate);
+  document.getElementById('result-code').textContent = code;
+  document.getElementById('result-info').textContent = `有效至：${expireDate}　助理：${name}`;
+  document.getElementById('result').style.display = 'block';
+  document.getElementById('result-code').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
+
+document.getElementById('copy-btn').addEventListener('click', () => {
+  const code = document.getElementById('result-code').textContent;
+  if (!code) return;
+  navigator.clipboard.writeText(code).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = '✅ 已复制！';
+    setTimeout(() => { btn.textContent = '📋 一键复制试用码'; }, 2000);
+  }).catch(() => {
+    // 兜底：选中文字
+    const el = document.getElementById('result-code');
+    const range = document.createRange(); range.selectNodeContents(el);
+    window.getSelection().removeAllRanges(); window.getSelection().addRange(range);
+    alert('请按 Ctrl+C 复制');
+  });
+});
+</script>
+</body>
+</html>

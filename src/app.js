@@ -2,6 +2,7 @@ import { renderImageEditPage, initImageEditPage, PRESETS } from './pages/ImageEd
 import { renderTextOverlayPage, initTextOverlayPage } from './pages/TextOverlay.js';
 import { renderEditWorkbench, initEditWorkbench, undoWorkbench, saveCurrentWorkbench, exportCurrentWorkbenchImage, copyCurrentWorkbenchBody, exportCurrentWorkbenchBody } from './pages/EditWorkbench.js';
 import { renderCollageExport, initCollageExport } from './pages/CollageExport.js';
+import { checkStoredLicense, verifyLicense, storeLicense, clearLicense } from './license.js';
 
 // ===== GLOBAL STATE =====
 // 数据模型说明
@@ -1034,6 +1035,81 @@ window.addEventListener('hashchange', () => {
   }
 });
 
-const initPage = window.location.hash.replace('#', '') || 'video';
-state.currentPage = ['video', 'edit', 'text', 'workbench', 'export'].includes(initPage) ? initPage : 'video';
-render();
+// ===== 试用码授权入口 =====
+function renderLicenseScreen(msg) {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="ft-license-screen">
+      <div class="ft-license-box">
+        <div class="ft-license-logo">✦</div>
+        <div class="ft-license-title">美食养生贴图工具</div>
+        <div class="ft-license-edition">助理试用版</div>
+        <div class="ft-license-label">请输入试用码</div>
+        <input type="text" id="ft-license-input" class="ft-license-input" placeholder="粘贴试用码…" autocomplete="off" spellcheck="false">
+        <button id="ft-license-btn" class="ft-license-btn">进 入 工 具</button>
+        ${msg ? `<div class="ft-license-msg ${msg.type}">${msg.text}</div>` : '<div class="ft-license-msg"></div>'}
+        <div class="ft-license-hint">试用码由管理员提供，到期后请联系管理员续期。</div>
+      </div>
+    </div>
+  `;
+  const input = document.getElementById('ft-license-input');
+  const btn = document.getElementById('ft-license-btn');
+  const msgEl = document.querySelector('.ft-license-msg');
+
+  async function doVerify() {
+    const code = input.value.trim();
+    if (!code) { msgEl.textContent = '请先粘贴试用码'; msgEl.className = 'ft-license-msg error'; return; }
+    btn.disabled = true; btn.textContent = '验证中…';
+    const result = await verifyLicense(code);
+    btn.disabled = false; btn.textContent = '进 入 工 具';
+    if (!result.ok) {
+      msgEl.textContent = '试用码无效，请检查后重试';
+      msgEl.className = 'ft-license-msg error';
+      return;
+    }
+    if (result.expired) {
+      msgEl.textContent = '试用已到期，请联系管理员';
+      msgEl.className = 'ft-license-msg error';
+      return;
+    }
+    storeLicense(code);
+    msgEl.textContent = `验证通过，欢迎 ${result.name}（有效至 ${result.expireDate}）`;
+    msgEl.className = 'ft-license-msg ok';
+    setTimeout(() => bootApp(), 800);
+  }
+
+  btn.addEventListener('click', doVerify);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') doVerify(); });
+}
+
+function bootApp() {
+  const app = document.getElementById('app');
+  app.innerHTML = '';
+  const initPage = window.location.hash.replace('#', '') || 'video';
+  state.currentPage = ['video', 'edit', 'text', 'workbench', 'export'].includes(initPage) ? initPage : 'video';
+  render();
+  // 每分钟检查一次试用码是否过期
+  setInterval(async () => {
+    const result = await checkStoredLicense();
+    if (!result.ok || result.expired) {
+      clearLicense();
+      renderLicenseScreen({ type: 'error', text: '试用已到期，请联系管理员' });
+    }
+  }, 60 * 1000);
+}
+
+async function boot() {
+  const result = await checkStoredLicense();
+  if (result.ok && !result.expired) {
+    bootApp();
+  } else {
+    if (result.ok && result.expired) {
+      clearLicense();
+      renderLicenseScreen({ type: 'error', text: '试用已到期，请联系管理员' });
+    } else {
+      renderLicenseScreen(null);
+    }
+  }
+}
+
+boot();

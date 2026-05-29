@@ -2046,3 +2046,43 @@ textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(
 .cx-block-h { font-size: 13px; font-weight: 800; color: var(--color-text); margin: 10px 2px 6px; }
 .cx-block-h:first-of-type { margin-top: 4px; }
 .cx-pubbody #cx-pubbody-text { width: 100%; min-height: 140px; resize: vertical; box-sizing: border-box; }
+
+/* ===== 试用码授权页 ===== */
+.ft-license-screen {
+  position: fixed; inset: 0; z-index: 9999;
+  background: linear-gradient(135deg, #0d1f3c 0%, #1d3a7a 100%);
+  display: flex; align-items: center; justify-content: center;
+}
+.ft-license-box {
+  background: #fff; border-radius: 20px; padding: 44px 40px 36px;
+  width: 380px; max-width: calc(100vw - 32px);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+}
+.ft-license-logo { font-size: 36px; color: var(--color-primary); line-height: 1; }
+.ft-license-title { font-size: 22px; font-weight: 900; color: var(--color-text); letter-spacing: 0.02em; }
+.ft-license-edition {
+  font-size: 13px; font-weight: 700; color: #fff;
+  background: var(--color-primary); border-radius: 999px; padding: 2px 14px; margin-bottom: 4px;
+}
+.ft-license-label { font-size: 13px; color: var(--color-text-secondary); font-weight: 700; width: 100%; }
+.ft-license-input {
+  width: 100%; height: 44px; padding: 0 14px; box-sizing: border-box;
+  border: 2px solid var(--color-border); border-radius: 10px;
+  font-size: 13px; font-family: monospace; letter-spacing: 0.05em;
+  outline: none; transition: border-color 0.15s;
+}
+.ft-license-input:focus { border-color: var(--color-primary); }
+.ft-license-btn {
+  width: 100%; height: 48px; border-radius: 12px;
+  background: var(--color-primary); color: #fff;
+  font-size: 16px; font-weight: 900; letter-spacing: 0.15em;
+  border: none; cursor: pointer; margin-top: 4px;
+  transition: background 0.15s, opacity 0.15s;
+}
+.ft-license-btn:hover { background: var(--color-primary-dark); }
+.ft-license-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.ft-license-msg { min-height: 20px; font-size: 12px; font-weight: 700; text-align: center; }
+.ft-license-msg.error { color: #d42a2a; }
+.ft-license-msg.ok { color: #1aa760; }
+.ft-license-hint { font-size: 11px; color: var(--color-text-muted); text-align: center; line-height: 1.6; }
