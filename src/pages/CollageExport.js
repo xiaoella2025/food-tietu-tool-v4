@@ -240,7 +240,14 @@ function syncItems() {
   if (!Array.isArray(C.items)) C.items = [];
   const ids = sourceList().map(s => s.id);
   C.items = C.items.filter(it => ids.includes(it.frameId));
-  ids.forEach(id => { if (!C.items.find(it => it.frameId === id)) C.items.push({ frameId: id, on: true }); });
+  // 默认参与规则：有已保存成图时，新帧默认只有已保存的参与；否则全部参与
+  const hasSaved = ids.some(id => !!(editResultsRef[id] && editResultsRef[id].dataUrl));
+  ids.forEach(id => {
+    if (!C.items.find(it => it.frameId === id)) {
+      const isSaved = !!(editResultsRef[id] && editResultsRef[id].dataUrl);
+      C.items.push({ frameId: id, on: hasSaved ? isSaved : true });
+    }
+  });
 }
 
 // 拼图素材来源：优先已保存成图，其次成图编辑底图，再次原图
@@ -269,8 +276,20 @@ function applyRatio(r) {
 
 // ===== 底部队列 =====
 function renderQueue() {
+  const pCount = participants().length;
+  const totalCount = C.items.length;
+  const hasSavedAny = C.items.some(it => !!(editResultsRef[it.frameId] && editResultsRef[it.frameId].dataUrl));
   return `
     <div class="cx-queue" id="cx-queue">
+      <div class="cx-queue-bar">
+        <button class="cx-qbar-btn" id="cx-qbar-all">全选</button>
+        <button class="cx-qbar-btn" id="cx-qbar-none">取消全选</button>
+        ${hasSavedAny ? `<button class="cx-qbar-btn" id="cx-qbar-saved">只选已保存</button>` : ''}
+        <span class="cx-qbar-count">已参与 ${pCount} / ${totalCount} 张</span>
+        <span style="flex:1"></span>
+        <button class="cx-qbar-btn primary" id="cx-batch-png" ${pCount === 0 ? 'disabled' : ''}>批量导出成品</button>
+        <button class="cx-qbar-btn" id="cx-batch-zip" ${pCount === 0 ? 'disabled' : ''}>批量 ZIP</button>
+      </div>
       <div class="cx-queue-scroll">
         ${C.items.map((it, idx) => {
           const s = srcById(it.frameId); if (!s) return '';
@@ -1269,6 +1288,11 @@ function setNum(k, v) {
 function bindQueue() {
   const q = document.getElementById('cx-queue'); if (!q) return;
   q.addEventListener('click', e => {
+    if (e.target.id === 'cx-qbar-all') { C.items.forEach(it => it.on = true); loadImages(() => { refreshQueue(); redraw(); }); return; }
+    if (e.target.id === 'cx-qbar-none') { C.items.forEach(it => it.on = false); refreshQueue(); redraw(); return; }
+    if (e.target.id === 'cx-qbar-saved') { C.items.forEach(it => { it.on = !!(editResultsRef[it.frameId] && editResultsRef[it.frameId].dataUrl); }); loadImages(() => { refreshQueue(); redraw(); }); return; }
+    if (e.target.id === 'cx-batch-png') { batchExportFinalsPng(); return; }
+    if (e.target.id === 'cx-batch-zip') { batchExportFinalsZip(); return; }
     const add = e.target.closest('[data-addcanvas]'); if (add) { addFreeImageFromSource(add.dataset.addcanvas); return; }
     const rep = e.target.closest('[data-replace]'); if (rep) { replaceSelectedImage(rep.dataset.replace); return; }
     const tg = e.target.closest('[data-toggle]'); if (tg) { const it = C.items.find(x => x.frameId === tg.dataset.toggle); if (it) it.on = !it.on; loadImages(() => { refreshQueue(); redraw(); }); return; }
@@ -1659,6 +1683,63 @@ function copyCopy() {
   else fallbackCopy(txt);
 }
 function fallbackCopy(txt) { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); toast('文案已复制'); } catch (e) { toast('复制失败，请手动复制'); } ta.remove(); }
+
+// 批量导出已参与图片的成品图 PNG（单图成品模式下逐帧导出，其他模式导出当前拼图）
+function batchExportFinalsPng() {
+  commitInline();
+  const parts = participants();
+  if (parts.length === 0) { toast('请先选择参与图片'); return; }
+  const scale = exportScale();
+  const fmt = C.settings.exp.format;
+  const mime = fmt === 'jpg' ? 'image/jpeg' : 'image/png';
+  const ext = fmt === 'jpg' ? 'jpg' : 'png';
+  if (C.settings.pinstyle === 'single') {
+    const origLayers = C.layers.slice();
+    parts.forEach((s, i) => {
+      C.layers = origLayers.filter(l => l.kind !== 'image' || l.frameId === s.id);
+      const cv = renderFull(scale);
+      downloadData(cv.toDataURL(mime, C.settings.exp.quality / 100), `final-${String(i + 1).padStart(3, '0')}.${ext}`);
+    });
+    C.layers = origLayers;
+    redraw();
+    toast(`已导出 ${parts.length} 张成品图`);
+  } else {
+    downloadData(renderFull(scale).toDataURL(mime, C.settings.exp.quality / 100), `final-001.${ext}`);
+    toast('已导出拼图成品');
+  }
+}
+
+// 批量打包 ZIP 已参与图片成品图
+function batchExportFinalsZip() {
+  commitInline();
+  const parts = participants();
+  if (parts.length === 0) { toast('请先选择参与图片'); return; }
+  const scale = exportScale();
+  const fmt = C.settings.exp.format;
+  const mime = fmt === 'jpg' ? 'image/jpeg' : 'image/png';
+  const ext = fmt === 'jpg' ? 'jpg' : 'png';
+  const files = [];
+  if (C.settings.pinstyle === 'single') {
+    const origLayers = C.layers.slice();
+    parts.forEach((s, i) => {
+      C.layers = origLayers.filter(l => l.kind !== 'image' || l.frameId === s.id);
+      const data = renderFull(scale).toDataURL(mime, C.settings.exp.quality / 100);
+      files.push({ name: `final-${String(i + 1).padStart(3, '0')}.${ext}`, data: dataUrlToBytes(data) });
+    });
+    C.layers = origLayers;
+    redraw();
+  } else {
+    const data = renderFull(scale).toDataURL(mime, C.settings.exp.quality / 100);
+    files.push({ name: `final-001.${ext}`, data: dataUrlToBytes(data) });
+  }
+  if (!files.length) { toast('没有可导出的内容'); return; }
+  const zip = makeZip(files);
+  const blob = new Blob([zip], { type: 'application/zip' });
+  const url = URL.createObjectURL(blob);
+  downloadData(url, `成品图_${Date.now()}.zip`);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  toast(`已打包 ${files.length} 张成品图`);
+}
 
 function exportZip() {
   commitInline();

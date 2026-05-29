@@ -1948,6 +1948,11 @@ textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(
 
 /* 队列 */
 .cx-queue { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); padding: 8px; margin-top: 8px; }
+.cx-queue-bar { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; padding-bottom: 7px; margin-bottom: 6px; border-bottom: 1px solid var(--color-border); }
+.cx-qbar-btn { font-size: 11px; padding: 3px 9px; border-radius: 4px; border: 1px solid var(--color-border); background: #fff; cursor: pointer; white-space: nowrap; line-height: 1.4; }
+.cx-qbar-btn.primary { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+.cx-qbar-btn:disabled { opacity: 0.45; cursor: default; pointer-events: none; }
+.cx-qbar-count { font-size: 12px; font-weight: 700; color: var(--color-primary); }
 .cx-queue-scroll { display: flex; gap: 8px; overflow-x: auto; }
 .cx-qcard { position: relative; flex: 0 0 110px; border: 2px solid transparent; border-radius: 8px; padding: 4px; background: #f5f8ff; cursor: grab; }
 .cx-qcard.on { border-color: var(--color-primary); }
