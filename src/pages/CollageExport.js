@@ -549,7 +549,10 @@ function renderBgPanel() {
       <button class="cx-add ${pasteAsBg ? 'primary' : ''}" id="cx-bgpaste-btn">${pasteAsBg ? '等待粘贴…' : '粘贴替换背景'}</button>
     </div>
     <div class="cx-addrow">
-      <button class="cx-add" data-bgctl="reset">重置背景</button>
+      <button class="cx-add primary" data-bgctl="contain">适应画布（完整显示）</button>
+      <button class="cx-add" data-bgctl="reset">重置位置</button>
+    </div>
+    <div class="cx-addrow">
       <button class="cx-add" data-bgctl="restore">恢复为浮层</button>
       <button class="cx-add" data-bgctl="del">删除背景图</button>
     </div>
@@ -1162,16 +1165,28 @@ function handleRightClick(e) {
     const name = prompt('背景模板名称：', '背景模板' + (bgTemplates.length + 1)); if (!name) return;
     if (bgTemplates.length >= BG_TPL_MAX) { toast(`最多保存 ${BG_TPL_MAX} 个背景模板，请先删除一些`); return; }
     const dataUrl = l.stype === 'img' ? l.dataUrl : null;
-    const tpl = { name: name.trim(), dataUrl, xPct: l.xPct || 0.5, yPct: l.yPct || 0.5, scale: l.scale || 2.5, opacity: l.opacity != null ? l.opacity : 1 };
+    // sticker-kind bg 用 size；image-kind bg 用 scale（两者都存，套用时按 kind 选）
+    const tpl = { name: name.trim(), dataUrl, xPct: l.xPct || 0.5, yPct: l.yPct || 0.5,
+      size: l.kind === 'sticker' ? (l.size || containBgSize(1)) : null,
+      scale: l.kind !== 'sticker' ? (l.scale || 1) : null,
+      opacity: l.opacity != null ? l.opacity : 1 };
     addBgTemplate(tpl).then(id => { tpl.id = id; bgTemplates.push(tpl); refreshBgPanel(); toast('已保存背景模板：' + tpl.name); }).catch(() => toast('保存失败，请重试')); return;
   }
   if (t.id === 'cx-bgtpl-apply') {
     const sel = document.getElementById('cx-bgtpl-sel'); if (!sel || sel.value === '') { toast('请先选择一个背景模板'); return; }
     const tpl = bgTemplates[+sel.value]; if (!tpl) return;
     if (!tpl.dataUrl) { toast('该模板没有背景图，无法套用'); return; }
-    setBgFromDataUrl(tpl.dataUrl);
-    // 套用位置/缩放/透明度
-    setTimeout(() => { const bl = bgLayer(); if (!bl) return; bl.xPct = tpl.xPct; bl.yPct = tpl.yPct; bl.scale = tpl.scale; bl.opacity = tpl.opacity; redraw(); refreshBgPanel(); toast('已套用背景模板：' + tpl.name); }, 60); return;
+    // 使用回调确保 bg 层创建后再设置位置/尺寸
+    setBgFromDataUrl(tpl.dataUrl, bl => {
+      if (!bl) return;
+      bl.xPct = tpl.xPct != null ? tpl.xPct : 0.5;
+      bl.yPct = tpl.yPct != null ? tpl.yPct : 0.5;
+      if (bl.kind === 'sticker' && tpl.size != null) bl.size = tpl.size;
+      else if (bl.kind !== 'sticker' && tpl.scale != null) bl.scale = tpl.scale;
+      if (tpl.opacity != null) bl.opacity = tpl.opacity;
+      redraw(); refreshBgPanel();
+      toast('已套用背景模板：' + tpl.name);
+    }); return;
   }
   if (t.id === 'cx-bgtpl-del') {
     const sel = document.getElementById('cx-bgtpl-sel'); if (!sel || sel.value === '') { toast('请先选择要删除的背景模板'); return; }
@@ -1196,7 +1211,8 @@ function handleRightClick(e) {
     else if (k === 'zout') { if (l.kind === 'sticker') l.size = Math.max(40, l.size * 0.9); else l.scale = Math.max(0.2, (l.scale || 1) * 0.9); }
     else if (k === 'up') l.yPct -= 0.04; else if (k === 'down') l.yPct += 0.04;
     else if (k === 'left') l.xPct -= 0.04; else if (k === 'right') l.xPct += 0.04;
-    else if (k === 'reset') { l.xPct = 0.5; l.yPct = 0.5; l.rotate = 0; l.opacity = 1; if (l.kind === 'sticker') l.size = Math.max(designW, designH) * 1.15; else l.scale = 2.5; }
+    else if (k === 'contain') { applyContainFitToBgLayer(l); }
+    else if (k === 'reset') { l.xPct = 0.5; l.yPct = 0.5; l.rotate = 0; l.opacity = 1; applyContainFitToBgLayer(l); }
     else if (k === 'restore') { l.asBg = false; selectedLayerId = l.id; redraw(); refreshRight(); toast('已恢复为浮层'); return; }
     else if (k === 'del') { if (!window.confirm('删除背景图？')) return; C.layers = C.layers.filter(x => x !== l); redraw(); refreshRight(); toast('已删除背景图'); return; }
     redraw(); refreshBgPanel(); return;
@@ -1516,21 +1532,69 @@ function handleBgUpload(e) {
   const rd = new FileReader(); rd.onload = ev => setBgFromDataUrl(ev.target.result);
   rd.readAsDataURL(f); e.target.value = '';
 }
-function setBgFromDataUrl(dataUrl) {
+// 计算背景图 contain 尺寸（完整显示整张图）
+// 对 sticker-kind bg：返回 size（=显示宽度）使图完整居中
+// 对 image-kind bg：返回 scale 使图完整居中
+function containBgSize(ir) {
+  // bw=size, bh=size/ir; 同时满足 bw<=designW && bh<=designH
+  return Math.min(designW, designH * ir);
+}
+function containBgScale(ir) {
+  // w=designW*0.4*scale, h=w/ir; 同时满足 w<=designW && h<=designH
+  return Math.min(2.5, (designH * ir) / (designW * 0.4));
+}
+function applyContainFitToBgLayer(l) {
+  const img = imgCache[l.id] || imgCache[l.frameId];
+  if (!img || !img.naturalWidth) return;
+  const ir = img.naturalWidth / img.naturalHeight;
+  if (l.kind === 'sticker') l.size = containBgSize(ir);
+  else l.scale = containBgScale(ir);
+  l.xPct = 0.5; l.yPct = 0.5;
+}
+
+function setBgFromDataUrl(dataUrl, onReady) {
   pushUndoC();
   C.layers = C.layers || [];
-  const ex = bgLayer();
-  if (ex) {
-    delete imgCache[ex.id]; ex.dataUrl = dataUrl; ex.stype = 'img';
-    loadImages(() => { redraw(); refreshBgPanel(); });
-    toast('已替换背景图');
-    return;
-  }
-  const id = 'BG-' + Date.now() + Math.random().toString(36).slice(2, 5);
-  C.layers.unshift({ id, kind: 'sticker', stype: 'img', dataUrl, size: Math.max(designW, designH) * 1.15, xPct: 0.5, yPct: 0.5, rotate: 0, asBg: true, opacity: 1 });
-  selectedLayerId = null;
-  loadImages(() => { redraw(); refreshBgPanel(); refreshTextStyle(); });
-  toast('已设为背景图');
+  // 先加载图片获取尺寸，再创建图层，默认 contain（完整显示）
+  const img = new Image();
+  img.onload = () => {
+    const ir = img.naturalWidth / img.naturalHeight;
+    const sz = containBgSize(ir);
+    const ex = bgLayer();
+    if (ex) {
+      const oldId = ex.id;
+      delete imgCache[oldId];
+      ex.dataUrl = dataUrl; ex.stype = 'img'; ex.size = sz; ex.xPct = 0.5; ex.yPct = 0.5;
+      imgCache[oldId] = img;
+      redraw(); refreshBgPanel();
+      onReady && onReady(ex);
+      toast('已替换背景图（完整显示）');
+      return;
+    }
+    const id = 'BG-' + Date.now() + Math.random().toString(36).slice(2, 5);
+    imgCache[id] = img;
+    const layer = { id, kind: 'sticker', stype: 'img', dataUrl, size: sz, xPct: 0.5, yPct: 0.5, rotate: 0, asBg: true, opacity: 1 };
+    C.layers.unshift(layer);
+    selectedLayerId = null;
+    redraw(); refreshBgPanel(); refreshTextStyle();
+    onReady && onReady(layer);
+    toast('已设为背景图（完整显示）');
+  };
+  img.onerror = () => {
+    // 加载失败时降级回原逻辑
+    const ex = bgLayer();
+    if (ex) {
+      delete imgCache[ex.id]; ex.dataUrl = dataUrl; ex.stype = 'img';
+      loadImages(() => { redraw(); refreshBgPanel(); onReady && onReady(ex); });
+    } else {
+      const id = 'BG-' + Date.now() + Math.random().toString(36).slice(2, 5);
+      C.layers.unshift({ id, kind: 'sticker', stype: 'img', dataUrl, size: Math.min(designW, designH), xPct: 0.5, yPct: 0.5, rotate: 0, asBg: true, opacity: 1 });
+      selectedLayerId = null;
+      loadImages(() => { redraw(); refreshBgPanel(); refreshTextStyle(); onReady && onReady(bgLayer()); });
+    }
+    toast('已设为背景图');
+  };
+  img.src = dataUrl;
 }
 function handlePaste(e) {
   if (!document.getElementById('cx-canvas')) return; // 非本页
@@ -1541,7 +1605,7 @@ function handlePaste(e) {
       const rd = new FileReader();
       rd.onload = ev => {
         const url = ev.target.result;
-        if (pasteAsBg) { setBgFromDataUrl(url); pasteAsBg = false; toast('已粘贴为背景图'); }
+        if (pasteAsBg) { setBgFromDataUrl(url); pasteAsBg = false; }
         else if (C.settings.pinstyle !== 'free' && cellSel) {
           pushUndoC(); const item = itemById(cellSel); if (item) { delete imgCache['ov-' + item.frameId]; item.imgUrl = url; item.offX = 0; item.offY = 0; item.scale = 1; loadImages(() => { redraw(); refreshPinZoom(); }); toast('已替换当前图片'); }
         } else {
