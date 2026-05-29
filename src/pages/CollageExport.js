@@ -178,6 +178,8 @@ let pasteAsBg = false;        // 下一次 Ctrl+V 作为"背景图"处理
 let undoStackC = [];     // 撤销快照栈（最近10步）
 let accordion = { scheme: true, pub: true, layout: true, pin: true, canvas: false, bgimg: true, export: false, tstyle: false, tobj: true, sticker: false, small: false };
 
+let bgTemplates = [];  // 背景模板，从 IndexedDB 加载
+
 let drag = { active: false, id: null, ox: 0, oy: 0 };
 let resize = { active: false, id: null, handle: null, sx: 0, sy: 0, startFont: 0, startW: 0, startBoxW: 0, startBoxH: 0, startSize: 0 };
 let rotateDrag = { active: false, id: null, cx: 0, cy: 0, a0: 0, r0: 0 };
@@ -501,6 +503,19 @@ function bgToggleBtn(l) {
   return `<button class="cx-add" data-bgtoggle="1" style="width:100%;margin-bottom:6px">置为背景（放到拼图格子下面）</button>`;
 }
 function bgLayer() { return (C.layers || []).find(l => l.asBg) || null; }
+function renderBgTemplateSection(hasBgImg) {
+  const tplOpts = bgTemplates.map((t, i) => `<option value="${i}">${escapeHTML(t.name)}</option>`).join('');
+  return `
+    <div class="cx-flabel" style="margin-top:10px">背景模板</div>
+    <div class="cx-block-desc" style="margin-bottom:4px">保存背景图（位置/缩放/透明度），以后快速复用。</div>
+    <div class="cx-row" style="gap:4px">
+      <select id="cx-bgtpl-sel" style="flex:1;min-width:0"><option value="">— 选择背景模板 —</option>${tplOpts}</select>
+      <button class="cx-add" id="cx-bgtpl-apply" ${bgTemplates.length === 0 ? 'disabled' : ''}>套用</button>
+      <button class="cx-add" id="cx-bgtpl-del" ${bgTemplates.length === 0 ? 'disabled' : ''}>删除</button>
+    </div>
+    ${hasBgImg ? `<button class="cx-add primary" id="cx-bgtpl-save" style="width:100%;margin-top:4px">保存当前为背景模板</button>` : ''}
+  `;
+}
 function renderBgPanel() {
   const l = bgLayer();
   if (!l) {
@@ -514,7 +529,8 @@ function renderBgPanel() {
         <button class="cx-add ${pasteAsBg ? 'primary' : ''}" id="cx-bgpaste-btn">${pasteAsBg ? '等待粘贴…' : '粘贴图片作为背景'}</button>
       </div>
       ${canSetBg ? `<button class="cx-add" data-bgtoggle="1" style="width:100%;margin-top:6px">把当前选中图片设为背景</button>` : ''}
-      <div class="cx-addrow"><button class="cx-add" data-bgctl="del" disabled>清除背景图</button></div>`;
+      <div class="cx-addrow"><button class="cx-add" data-bgctl="del" disabled>清除背景图</button></div>
+      ${renderBgTemplateSection(false)}`;
   }
   const op = l.opacity != null ? l.opacity : 1;
   return `
@@ -537,27 +553,34 @@ function renderBgPanel() {
       <button class="cx-add" data-bgctl="restore">恢复为浮层</button>
       <button class="cx-add" data-bgctl="del">删除背景图</button>
     </div>
+    ${renderBgTemplateSection(true)}
   `;
 }
 function renderImageLayerPanel(l) {
   return `
-    ${layerOrderBar()}
-    ${bgToggleBtn(l)}
-    <div class="cx-flabel">图片取景（在框内调整主体）</div>
+    <div class="cx-note" style="margin-bottom:5px;font-size:11px">图层拖动/缩放调整整张图片的位置和大小；图片取景调整图片框里显示的内容。</div>
+    <div class="cx-flabel">图层操作</div>
+    <div class="cx-row"><div class="cx-btng">
+      <button data-order="up">上移</button>
+      <button data-order="down">下移</button>
+      <button data-order="top">置顶</button>
+      <button data-order="bottom">置底</button>
+      <button data-bgtoggle="1">置为背景</button>
+    </div></div>
+    <div class="cx-addrow" style="margin-top:4px">
+      <button class="cx-add ${awaitingReplace ? 'primary' : ''}" id="cx-img-replace">${awaitingReplace ? '点底部图替换…' : '替换图片'}</button>
+      <button class="cx-del" data-dellayer="1">删除图片</button>
+    </div>
+    <div class="cx-flabel" style="margin-top:6px">图片取景</div>
     <div class="cx-row"><div class="cx-btng">
       <button data-nudge="zin">取景放大</button><button data-nudge="zout">取景缩小</button>
       <button data-nudge="up">取景上移</button><button data-nudge="down">取景下移</button>
       <button data-nudge="left">取景左移</button><button data-nudge="right">取景右移</button>
+      <button id="cx-img-resetview">重置取景</button>
     </div></div>
     <div class="cx-slider2" data-img="innerScale"><label>取景缩放</label><input type="range" min="100" max="280" step="5" value="${Math.round((l.innerScale || 1) * 100)}"><span class="cx-val">${Math.round((l.innerScale || 1) * 100)}</span></div>
     <div class="cx-slider2" data-img="innerOffX"><label>取景左右</label><input type="range" min="-100" max="100" step="5" value="${Math.round((l.innerOffX || 0) * 100)}"><span class="cx-val">${Math.round((l.innerOffX || 0) * 100)}</span></div>
     <div class="cx-slider2" data-img="innerOffY"><label>取景上下</label><input type="range" min="-100" max="100" step="5" value="${Math.round((l.innerOffY || 0) * 100)}"><span class="cx-val">${Math.round((l.innerOffY || 0) * 100)}</span></div>
-    <div class="cx-addrow">
-      <button class="cx-add" id="cx-img-resetview">重置取景</button>
-      <button class="cx-add ${awaitingReplace ? 'primary' : ''}" id="cx-img-replace">${awaitingReplace ? '点底部图替换…' : '替换图片'}</button>
-    </div>
-    <button class="cx-del" data-dellayer="1">删除此图片</button>
-    <div class="cx-note">自由图片：拖动移动、拖角缩放整体、顶部圆点旋转；用滑杆在框内取景；「替换图片」后点底部素材换图。</div>
   `;
 }
 function renderStickerBlock() {
@@ -593,8 +616,10 @@ export function initCollageExport() {
   canvas = document.getElementById('cx-canvas');
   if (!canvas) return;
   ctx = canvas.getContext('2d');
-  loadImages(() => { sizeCanvas(); redraw(); });
+  loadImages(() => { autoFitSingleImages(); sizeCanvas(); redraw(); });
   bindAll();
+  // 异步加载背景模板，加载完刷新面板
+  loadBgTemplates().then(list => { bgTemplates = list || []; refreshBgPanel(); });
 }
 
 function loadImages(cb) {
@@ -1122,8 +1147,8 @@ function handleRightClick(e) {
   const t = e.target;
   const pub = t.closest('[data-pub]'); if (pub) { C.settings.ratio = pub.dataset.pub; applyRatio(C.settings.ratio); refreshRight(); sizeCanvas(); redraw(); return; }
   const ra = t.closest('[data-ratio]'); if (ra) { C.settings.ratio = ra.dataset.ratio; applyRatio(C.settings.ratio); refreshRight(); sizeCanvas(); redraw(); return; }
-  const la = t.closest('[data-layout]'); if (la) { pushUndoC(); const L = LAYOUTS.find(x => x.id === la.dataset.layout); C.settings.layout = L.id; C.settings.cols = L.cols; C.settings.pinstyle = 'grid'; if (participants().length === 0) toast('请先在底部选择要参与拼图的图片'); refreshRight(); loadImages(() => redraw()); return; }
-  const pin = t.closest('[data-pin]'); if (pin) { pushUndoC(); C.settings.pinstyle = pin.dataset.pin; cellSel = null; if (isFreeMode()) ensureFreeImages(); else if (participants().length === 0) toast('请先在底部选择要参与拼图的图片'); refreshRight(); loadImages(() => redraw()); return; }
+  const la = t.closest('[data-layout]'); if (la) { pushUndoC(); const L = LAYOUTS.find(x => x.id === la.dataset.layout); C.settings.layout = L.id; C.settings.cols = L.cols; C.settings.pinstyle = 'grid'; if (participants().length === 0) toast('请先在底部选择要参与拼图的图片'); refreshRight(); loadImages(() => { autoFitSingleImages(); redraw(); }); return; }
+  const pin = t.closest('[data-pin]'); if (pin) { pushUndoC(); C.settings.pinstyle = pin.dataset.pin; cellSel = null; if (isFreeMode()) ensureFreeImages(); else if (participants().length === 0) toast('请先在底部选择要参与拼图的图片'); refreshRight(); loadImages(() => { autoFitSingleImages(); redraw(); }); return; }
   if (t.id === 'cx-free-reset') { resetFreeImages(); loadImages(() => redraw()); return; }
   const bg = t.closest('[data-bg]'); if (bg) { const b = BG_PRESETS.find(x => x.id === bg.dataset.bg); C.settings.bg = { ...b }; refreshRight(); redraw(); return; }
   const fr = t.closest('[data-frame]'); if (fr) { C.settings.frame = fr.dataset.frame; refreshRight(); redraw(); return; }
@@ -1131,6 +1156,29 @@ function handleRightClick(e) {
   if (t.id === 'cx-upload-btn') { document.getElementById('cx-upload')?.click(); return; }
   if (t.id === 'cx-bgupload-btn') { document.getElementById('cx-bgupload')?.click(); return; }
   if (t.id === 'cx-bgpaste-btn') { pasteAsBg = !pasteAsBg; refreshBgPanel(); if (pasteAsBg) toast('已开启：下次 Ctrl+V 粘贴将作为背景图'); return; }
+  // 背景模板
+  if (t.id === 'cx-bgtpl-save') {
+    const l = bgLayer(); if (!l) { toast('请先添加背景图'); return; }
+    const name = prompt('背景模板名称：', '背景模板' + (bgTemplates.length + 1)); if (!name) return;
+    if (bgTemplates.length >= BG_TPL_MAX) { toast(`最多保存 ${BG_TPL_MAX} 个背景模板，请先删除一些`); return; }
+    const dataUrl = l.stype === 'img' ? l.dataUrl : null;
+    const tpl = { name: name.trim(), dataUrl, xPct: l.xPct || 0.5, yPct: l.yPct || 0.5, scale: l.scale || 2.5, opacity: l.opacity != null ? l.opacity : 1 };
+    addBgTemplate(tpl).then(id => { tpl.id = id; bgTemplates.push(tpl); refreshBgPanel(); toast('已保存背景模板：' + tpl.name); }).catch(() => toast('保存失败，请重试')); return;
+  }
+  if (t.id === 'cx-bgtpl-apply') {
+    const sel = document.getElementById('cx-bgtpl-sel'); if (!sel || sel.value === '') { toast('请先选择一个背景模板'); return; }
+    const tpl = bgTemplates[+sel.value]; if (!tpl) return;
+    if (!tpl.dataUrl) { toast('该模板没有背景图，无法套用'); return; }
+    setBgFromDataUrl(tpl.dataUrl);
+    // 套用位置/缩放/透明度
+    setTimeout(() => { const bl = bgLayer(); if (!bl) return; bl.xPct = tpl.xPct; bl.yPct = tpl.yPct; bl.scale = tpl.scale; bl.opacity = tpl.opacity; redraw(); refreshBgPanel(); toast('已套用背景模板：' + tpl.name); }, 60); return;
+  }
+  if (t.id === 'cx-bgtpl-del') {
+    const sel = document.getElementById('cx-bgtpl-sel'); if (!sel || sel.value === '') { toast('请先选择要删除的背景模板'); return; }
+    const idx = +sel.value; const tpl = bgTemplates[idx]; if (!tpl) return;
+    if (!window.confirm(`删除背景模板「${tpl.name}」？`)) return;
+    removeBgTemplate(tpl.id).then(() => { bgTemplates.splice(idx, 1); refreshBgPanel(); toast('已删除背景模板'); }); return;
+  }
   // 拼图工程
   if (t.id === 'cx-new-blank') { newBlank(); return; }
   if (t.id === 'cx-clear-canvas') { clearCanvas(); return; }
@@ -1230,7 +1278,7 @@ function addFreeImageFromSource(frameId) {
   const n = C.layers.filter(l => l.kind === 'image').length;
   C.layers.push({ id, kind: 'image', frameId, xPct: 0.3 + (n % 2) * 0.4, yPct: 0.3 + Math.floor(n / 2) * 0.3, scale: 1, rotate: 0, innerScale: 1, innerOffX: 0, innerOffY: 0 });
   selectedLayerId = id; awaitingReplace = false;
-  refreshRight(); loadImages(() => { sizeCanvas(); redraw(); });
+  refreshRight(); loadImages(() => { autoFitSingleImages(); sizeCanvas(); redraw(); });
   toast('已添加到画布（自由摆放）');
 }
 function replaceSelectedImage(frameId) {
@@ -1310,8 +1358,8 @@ function ensureFreeImages() {
   ps.forEach((p, i) => {
     if (have.has(p.id)) return;
     if (single) {
-      // 单图成品：居中、稍大，方便用户缩小让背景露出
-      C.layers.push({ id: 'IMG-' + p.id, kind: 'image', frameId: p.id, xPct: 0.5, yPct: 0.5, scale: 1.6, rotate: 0 });
+      // 单图成品：居中，_autoFitNeeded 标记加载后自动计算 cover scale
+      C.layers.push({ id: 'IMG-' + p.id, kind: 'image', frameId: p.id, xPct: 0.5, yPct: 0.5, scale: 2.5, rotate: 0, _autoFitNeeded: true });
     } else {
       const col = i % 2, row = Math.floor(i / 2);
       C.layers.push({ id: 'IMG-' + p.id, kind: 'image', frameId: p.id, xPct: 0.3 + col * 0.4, yPct: 0.28 + row * 0.32, scale: 1, rotate: 0 });
@@ -1321,6 +1369,70 @@ function ensureFreeImages() {
 function resetFreeImages() { C.layers = (C.layers || []).filter(l => l.kind !== 'image'); ensureFreeImages(); selectedLayerId = null; }
 function refreshPinZoom() { const acc = document.querySelector('.cx-acc[data-acc="pin"] .cx-acc-body'); if (acc) acc.innerHTML = renderPinStyle(); }
 function refreshBgPanel() { const acc = document.querySelector('.cx-acc[data-acc="bgimg"] .cx-acc-body'); if (acc) acc.innerHTML = renderBgPanel(); }
+
+// 单图成品：图像加载后自动计算 cover scale，让图填满画布
+function autoFitSingleImages() {
+  if (C.settings.pinstyle !== 'single') return;
+  C.layers.filter(l => l.kind === 'image' && l._autoFitNeeded).forEach(l => {
+    const img = imgCache[l.frameId];
+    if (!img || !img.naturalWidth) return;
+    const ir = img.naturalWidth / img.naturalHeight;
+    // box: w = designW*0.4*scale, h = w/ir; 需同时覆盖 designW、designH
+    const scaleForW = designW / (designW * 0.4);          // 2.5
+    const scaleForH = (designH * ir) / (designW * 0.4);
+    l.scale = Math.max(scaleForW, scaleForH) + 0.15;      // 留一点取景余量
+    delete l._autoFitNeeded;
+  });
+}
+
+// ===== 背景模板（IndexedDB，支持大 dataUrl）=====
+const BG_TPL_DB = 'cx-bg-templates-v1';
+const BG_TPL_STORE = 'templates';
+const BG_TPL_MAX = 30; // 最多保存 30 个模板
+
+function openBgTplDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(BG_TPL_DB, 1);
+    req.onupgradeneeded = ev => {
+      const db = ev.target.result;
+      if (!db.objectStoreNames.contains(BG_TPL_STORE)) {
+        db.createObjectStore(BG_TPL_STORE, { keyPath: 'id', autoIncrement: true });
+      }
+    };
+    req.onsuccess = ev => resolve(ev.target.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function loadBgTemplates() {
+  try {
+    const db = await openBgTplDb();
+    return new Promise(resolve => {
+      const tx = db.transaction(BG_TPL_STORE, 'readonly');
+      const req = tx.objectStore(BG_TPL_STORE).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => resolve([]);
+    });
+  } catch { return []; }
+}
+async function addBgTemplate(tpl) {
+  const db = await openBgTplDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(BG_TPL_STORE, 'readwrite');
+    const req = tx.objectStore(BG_TPL_STORE).add(tpl);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function removeBgTemplate(id) {
+  try {
+    const db = await openBgTplDb();
+    return new Promise(resolve => {
+      const tx = db.transaction(BG_TPL_STORE, 'readwrite');
+      tx.objectStore(BG_TPL_STORE).delete(id);
+      tx.oncomplete = () => resolve();
+    });
+  } catch {}
+}
 
 // ===== 方案 / 模板（localStorage，带容量保护）=====
 function safeSet(key, arr) {
@@ -1346,14 +1458,14 @@ export function undoCollageExport() {
   loadSnapshot(snap); selectedLayerId = null; cellSel = null; awaitingReplace = false;
   applyRatio(C.settings.ratio); imgCache = {};
   if (isFreeMode()) ensureFreeImages();
-  refreshRight(); refreshQueue(); loadImages(() => { sizeCanvas(); redraw(); }); refreshUndoBtn();
+  refreshRight(); refreshQueue(); loadImages(() => { autoFitSingleImages(); sizeCanvas(); redraw(); }); refreshUndoBtn();
   toast('已撤销');
 }
 function loadSnapshot(s) { C.items = JSON.parse(JSON.stringify(s.items || [])); C.layers = (JSON.parse(JSON.stringify(s.layers || []))).map(normalizeLayer); C.settings = Object.assign(defaultSettings(), JSON.parse(JSON.stringify(s.settings || {}))); if (!C.settings.small) C.settings.small = defaultSettings().small; C.copyBody = s.copyBody || ''; C.textDefault = s.textDefault || defaultText(); }
 function schemeSave() { const sel = document.getElementById('cx-scheme-sel'); const a = getSchemes(); if (sel && sel.value !== '') { a[+sel.value].snap = snapshot(); if (setSchemes(a)) toast('已保存当前拼图'); } else { const name = prompt('拼图工程名称：', '拼图' + (a.length + 1)); if (!name) return; a.push({ name: name.trim(), snap: snapshot() }); if (setSchemes(a)) { toast('已保存当前拼图'); refreshRight(); } } }
 function schemeCopyCurrent() { const a = getSchemes(); const name = prompt('复制为新拼图，名称：', '拼图副本'); if (!name) return; a.push({ name: name.trim(), snap: snapshot() }); if (setSchemes(a)) { toast('已复制为新拼图工程'); refreshRight(); } }
 function schemeDel() { const sel = document.getElementById('cx-scheme-sel'); const a = getSchemes(); if (!sel || sel.value === '') { toast('请先在下拉里选择要删除的拼图工程'); return; } if (!window.confirm('删除该拼图工程？（不影响底部素材）')) return; a.splice(+sel.value, 1); setSchemes(a); toast('已删除'); refreshRight(); }
-function schemeLoad(i) { const a = getSchemes(); if (!a[i]) return; loadSnapshot(a[i].snap); selectedLayerId = null; cellSel = null; awaitingReplace = false; applyRatio(C.settings.ratio); imgCache = {}; if (isFreeMode()) ensureFreeImages(); refreshRight(); refreshQueue(); loadImages(() => { sizeCanvas(); redraw(); }); toast(`已载入：${a[i].name}`); }
+function schemeLoad(i) { const a = getSchemes(); if (!a[i]) return; loadSnapshot(a[i].snap); selectedLayerId = null; cellSel = null; awaitingReplace = false; applyRatio(C.settings.ratio); imgCache = {}; if (isFreeMode()) ensureFreeImages(); refreshRight(); refreshQueue(); loadImages(() => { autoFitSingleImages(); sizeCanvas(); redraw(); }); toast(`已载入：${a[i].name}`); }
 function clearItemsState() { C.items.forEach(it => { it.on = false; delete it.offX; delete it.offY; delete it.scale; delete it.imgUrl; }); }
 function newBlank() {
   if (!window.confirm('新建空白拼图？将清空画布内容与参与图片选择（不删除底部素材库）。')) return;
@@ -1386,7 +1498,7 @@ function presetApply() {
   applyRatio(C.settings.ratio);
   if (isFreeMode()) ensureFreeImages();
   selectedLayerId = null; cellSel = null; awaitingReplace = false;
-  refreshRight(); refreshQueue(); loadImages(() => { sizeCanvas(); redraw(); });
+  refreshRight(); refreshQueue(); loadImages(() => { autoFitSingleImages(); sizeCanvas(); redraw(); });
   const n = participants().length, slots = slotsFor(C.settings.pinstyle, n);
   if (slots && n < slots.length) toast(`已套用模板：${p.name}。该版式需 ${slots.length} 张，当前 ${n} 张，空位显示"请添加图片"`);
   else toast(`已套用模板：${p.name}（已用当前已选图片）`);
