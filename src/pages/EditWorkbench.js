@@ -1555,6 +1555,15 @@ function pushUndo() {
   undoStack.push({ baseDataUrl: p.baseDataUrl, layers: JSON.stringify(p.layers), scripts: JSON.stringify(p.scripts) });
   if (undoStack.length > 10) undoStack.shift();
 }
+function pushBatchUndo(ids) {
+  const p = project();
+  const snap = { baseDataUrl: p.baseDataUrl, layers: JSON.stringify(p.layers), scripts: JSON.stringify(p.scripts), batchFrames: {} };
+  ids.forEach(id => {
+    if (id !== currentFrameId) { const fp = projectsRef[id]; if (fp) snap.batchFrames[id] = fp.baseDataUrl; }
+  });
+  undoStack.push(snap);
+  if (undoStack.length > 10) undoStack.shift();
+}
 export function undoWorkbench() {
   commitInlineEdit();
   if (undoStack.length === 0) { showToast('没有可撤销的操作'); return; }
@@ -1564,6 +1573,11 @@ export function undoWorkbench() {
   p.baseDataUrl = snap.baseDataUrl;
   p.layers = JSON.parse(snap.layers);
   p.scripts = JSON.parse(snap.scripts);
+  if (snap.batchFrames) {
+    Object.entries(snap.batchFrames).forEach(([id, baseDataUrl]) => {
+      const fp = projectsRef[id]; if (fp) fp.baseDataUrl = baseDataUrl;
+    });
+  }
   selectedLayerId = null;
   markDirty();
   refreshRight();
@@ -1662,24 +1676,29 @@ function applyRatioWithPadWb(frameId, ratio, padColor, cb) {
   const img = new Image();
   img.onload = () => {
     const srcW = img.naturalWidth, srcH = img.naturalHeight;
-    let newW = srcW, newH = srcH;
-    if (ratio !== '原图') {
-      const [rx, ry] = ratio.split(':').map(Number);
-      const targetAR = rx / ry;
-      const srcAR = srcW / srcH;
-      if (Math.abs(srcAR - targetAR) > 0.005) {
-        if (srcAR > targetAR) { newW = srcW; newH = Math.round(srcW / targetAR); }
-        else { newH = srcH; newW = Math.round(srcH * targetAR); }
-      }
-    }
-    if (newW === srcW && newH === srcH) { cb && cb(true); return; }
+    if (ratio === '原图') { cb && cb(true); return; }
+    const [rx, ry] = ratio.split(':').map(Number);
+    const targetAR = rx / ry;
+    const srcAR = srcW / srcH;
+    if (Math.abs(srcAR - targetAR) <= 0.005) { cb && cb(true); return; }
+    // New canvas: use the longer side of the source as the long side of the target ratio
+    const longSide = Math.max(srcW, srcH);
+    let newW, newH;
+    if (targetAR >= 1) { newW = longSide; newH = Math.round(longSide / targetAR); }
+    else { newH = longSide; newW = Math.round(longSide * targetAR); }
+    // Contain-fit: scale source to fit inside new canvas
+    const scale = Math.min(newW / srcW, newH / srcH);
+    const drawW = Math.round(srcW * scale);
+    const drawH = Math.round(srcH * scale);
+    const dx = Math.round((newW - drawW) / 2);
+    const dy = Math.round((newH - drawH) / 2);
     const out = document.createElement('canvas');
     out.width = newW; out.height = newH;
     const oc = out.getContext('2d');
     oc.imageSmoothingEnabled = true; oc.imageSmoothingQuality = 'high';
     oc.fillStyle = padColor || '#ffffff';
     oc.fillRect(0, 0, newW, newH);
-    oc.drawImage(img, Math.round((newW - srcW) / 2), Math.round((newH - srcH) / 2), srcW, srcH);
+    oc.drawImage(img, dx, dy, drawW, drawH);
     p.baseDataUrl = out.toDataURL('image/png');
     p.processed = true;
     cb && cb(true);
@@ -1692,6 +1711,7 @@ function batchApplyRatio() {
   const ids = [...batchSelectedIds].filter(id => framesRef.find(f => f.id === id));
   if (ids.length === 0) { showToast('请先选择图片'); return; }
   if (batchRatio === '原图') { showToast('当前选的是"原图"，无需改比例'); return; }
+  pushBatchUndo(ids);
   showToast(`正在处理 ${ids.length} 张图片...`);
   let done = 0, i = 0;
   function next() {
