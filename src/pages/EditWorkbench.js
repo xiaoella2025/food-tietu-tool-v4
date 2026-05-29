@@ -126,7 +126,6 @@ let accordion = { template: true, title: true, steps: false, body: false, style:
 let tplBringText = true;   // 成图模板应用方式：true=带入模板文字，false=仅套样式与位置
 
 let batchSelectedIds = new Set();
-let batchRatio = '原图';
 
 // ===== 入口 =====
 export function renderEditWorkbench({ frames, currentFrameId: cid, projects, results, onSwitchFrame, onSaveResult, onDeleteFrame }) {
@@ -1505,11 +1504,8 @@ function bindQueue() {
     if (del) { e.stopPropagation(); deleteFrame(del.dataset.frameDel); return; }
     if (e.target.id === 'wb-sel-all') { framesRef.forEach(f => batchSelectedIds.add(f.id)); refreshBatchBar(); refreshQueueChecks(); return; }
     if (e.target.id === 'wb-sel-none') { batchSelectedIds.clear(); refreshBatchBar(); refreshQueueChecks(); return; }
-    if (e.target.id === 'wb-batch-apply-ratio') { batchApplyRatio(); return; }
     if (e.target.id === 'wb-batch-export-png') { batchExportPNGs(); return; }
     if (e.target.id === 'wb-batch-export-zip') { batchExportZip(); return; }
-    const ratioBtn = e.target.closest('[data-batch-ratio]');
-    if (ratioBtn) { batchRatio = ratioBtn.dataset.batchRatio; refreshBatchBar(); return; }
     const card = e.target.closest('.wb-qcard');
     if (!card) return;
     const id = card.dataset.frameId;
@@ -1650,9 +1646,7 @@ function composeFrame(frameId, cb) {
   img.src = p.baseDataUrl || frame.sourceDataUrl;
 }
 
-function batchApplyRatio() {
-  showToast('批量改比例后续版本开放');
-}
+// 批量改比例：后续版本实现为非破坏性导出参数（不修改 baseDataUrl，不写白边进原图，只在导出时临时生成目标比例图片）
 
 function batchExportPNGs() {
   const ids = [...batchSelectedIds].filter(id => framesRef.find(f => f.id === id));
