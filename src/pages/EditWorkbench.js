@@ -481,7 +481,6 @@ function renderArtBlock() {
 // ===== 底部队列 =====
 function renderBatchBar() {
   const sel = batchSelectedIds.size;
-  const ratios = ['原图', '1:1', '3:4', '4:3', '9:16'];
   return `
     <div class="wb-batch-bar" id="wb-batch-bar">
       <div class="wb-batch-row">
@@ -493,9 +492,7 @@ function renderBatchBar() {
         <button class="wb-batch-btn" id="wb-batch-export-zip" ${sel === 0 ? 'disabled' : ''}>打包 ZIP</button>
       </div>
       <div class="wb-batch-row">
-        <span class="wb-batch-label">改比例：</span>
-        ${ratios.map(r => `<button class="wb-batch-ratio-btn${batchRatio === r ? ' active' : ''}" data-batch-ratio="${r}">${r}</button>`).join('')}
-        <button class="wb-batch-btn primary" id="wb-batch-apply-ratio" ${sel === 0 ? 'disabled' : ''}>应用到已选</button>
+        <span class="wb-batch-label" style="color:#999">批量改比例：后续版本开放</span>
       </div>
     </div>
   `;
@@ -1555,15 +1552,6 @@ function pushUndo() {
   undoStack.push({ baseDataUrl: p.baseDataUrl, layers: JSON.stringify(p.layers), scripts: JSON.stringify(p.scripts) });
   if (undoStack.length > 10) undoStack.shift();
 }
-function pushBatchUndo(ids) {
-  const p = project();
-  const snap = { baseDataUrl: p.baseDataUrl, layers: JSON.stringify(p.layers), scripts: JSON.stringify(p.scripts), batchFrames: {} };
-  ids.forEach(id => {
-    if (id !== currentFrameId) { const fp = projectsRef[id]; if (fp) snap.batchFrames[id] = fp.baseDataUrl; }
-  });
-  undoStack.push(snap);
-  if (undoStack.length > 10) undoStack.shift();
-}
 export function undoWorkbench() {
   commitInlineEdit();
   if (undoStack.length === 0) { showToast('没有可撤销的操作'); return; }
@@ -1573,11 +1561,6 @@ export function undoWorkbench() {
   p.baseDataUrl = snap.baseDataUrl;
   p.layers = JSON.parse(snap.layers);
   p.scripts = JSON.parse(snap.scripts);
-  if (snap.batchFrames) {
-    Object.entries(snap.batchFrames).forEach(([id, baseDataUrl]) => {
-      const fp = projectsRef[id]; if (fp) fp.baseDataUrl = baseDataUrl;
-    });
-  }
   selectedLayerId = null;
   markDirty();
   refreshRight();
@@ -1667,64 +1650,8 @@ function composeFrame(frameId, cb) {
   img.src = p.baseDataUrl || frame.sourceDataUrl;
 }
 
-function applyRatioWithPadWb(frameId, ratio, padColor, cb) {
-  const frame = framesRef.find(f => f.id === frameId);
-  const p = ensureProject(frameId);
-  if (!frame || !p) { cb && cb(false); return; }
-  const src = p.baseDataUrl || frame.sourceDataUrl;
-  if (!src) { cb && cb(false); return; }
-  const img = new Image();
-  img.onload = () => {
-    const srcW = img.naturalWidth, srcH = img.naturalHeight;
-    if (ratio === '原图') { cb && cb(true); return; }
-    const [rx, ry] = ratio.split(':').map(Number);
-    const targetAR = rx / ry;
-    const srcAR = srcW / srcH;
-    if (Math.abs(srcAR - targetAR) <= 0.005) { cb && cb(true); return; }
-    // New canvas: use the longer side of the source as the long side of the target ratio
-    const longSide = Math.max(srcW, srcH);
-    let newW, newH;
-    if (targetAR >= 1) { newW = longSide; newH = Math.round(longSide / targetAR); }
-    else { newH = longSide; newW = Math.round(longSide * targetAR); }
-    // Contain-fit: scale source to fit inside new canvas
-    const scale = Math.min(newW / srcW, newH / srcH);
-    const drawW = Math.round(srcW * scale);
-    const drawH = Math.round(srcH * scale);
-    const dx = Math.round((newW - drawW) / 2);
-    const dy = Math.round((newH - drawH) / 2);
-    const out = document.createElement('canvas');
-    out.width = newW; out.height = newH;
-    const oc = out.getContext('2d');
-    oc.imageSmoothingEnabled = true; oc.imageSmoothingQuality = 'high';
-    oc.fillStyle = padColor || '#ffffff';
-    oc.fillRect(0, 0, newW, newH);
-    oc.drawImage(img, dx, dy, drawW, drawH);
-    p.baseDataUrl = out.toDataURL('image/png');
-    p.processed = true;
-    cb && cb(true);
-  };
-  img.onerror = () => { cb && cb(false); };
-  img.src = src;
-}
-
 function batchApplyRatio() {
-  const ids = [...batchSelectedIds].filter(id => framesRef.find(f => f.id === id));
-  if (ids.length === 0) { showToast('请先选择图片'); return; }
-  if (batchRatio === '原图') { showToast('当前选的是"原图"，无需改比例'); return; }
-  pushBatchUndo(ids);
-  showToast(`正在处理 ${ids.length} 张图片...`);
-  let done = 0, i = 0;
-  function next() {
-    if (i >= ids.length) {
-      showToast(`已为 ${done} 张图片设为 ${batchRatio} 比例`);
-      if (ids.includes(currentFrameId)) loadBase(() => { sizeCanvas(); drawAll(); renderHandles(); });
-      refreshQueue();
-      return;
-    }
-    const id = ids[i++];
-    applyRatioWithPadWb(id, batchRatio, '#ffffff', ok => { if (ok) done++; next(); });
-  }
-  next();
+  showToast('批量改比例后续版本开放');
 }
 
 function batchExportPNGs() {
