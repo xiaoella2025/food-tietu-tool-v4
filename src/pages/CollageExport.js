@@ -287,8 +287,8 @@ function renderQueue() {
         ${hasSavedAny ? `<button class="cx-qbar-btn" id="cx-qbar-saved">只选已保存</button>` : ''}
         <span class="cx-qbar-count">已参与 ${pCount} / ${totalCount} 张</span>
         <span style="flex:1"></span>
-        <button class="cx-qbar-btn primary" id="cx-batch-png" ${pCount === 0 ? 'disabled' : ''}>批量导出成品</button>
-        <button class="cx-qbar-btn" id="cx-batch-zip" ${pCount === 0 ? 'disabled' : ''}>批量 ZIP</button>
+        <button class="cx-qbar-btn primary" id="cx-batch-png" ${pCount === 0 ? 'disabled' : ''}>批量导出单图成品</button>
+        <button class="cx-qbar-btn" id="cx-batch-zip" ${pCount === 0 ? 'disabled' : ''}>ZIP 单图成品</button>
       </div>
       <div class="cx-queue-scroll">
         ${C.items.map((it, idx) => {
@@ -1410,17 +1410,15 @@ function resetFreeImages() { C.layers = (C.layers || []).filter(l => l.kind !== 
 function refreshPinZoom() { const acc = document.querySelector('.cx-acc[data-acc="pin"] .cx-acc-body'); if (acc) acc.innerHTML = renderPinStyle(); }
 function refreshBgPanel() { const acc = document.querySelector('.cx-acc[data-acc="bgimg"] .cx-acc-body'); if (acc) acc.innerHTML = renderBgPanel(); }
 
-// 单图成品：图像加载后自动计算 cover scale，让图填满画布
+// 单图成品：图像加载后自动计算 contain-fit scale，图片完整显示在画布内
 function autoFitSingleImages() {
   if (C.settings.pinstyle !== 'single') return;
   C.layers.filter(l => l.kind === 'image' && l._autoFitNeeded).forEach(l => {
     const img = imgCache[l.frameId];
     if (!img || !img.naturalWidth) return;
     const ir = img.naturalWidth / img.naturalHeight;
-    // box: w = designW*0.4*scale, h = w/ir; 需同时覆盖 designW、designH
-    const scaleForW = designW / (designW * 0.4);          // 2.5
-    const scaleForH = (designH * ir) / (designW * 0.4);
-    l.scale = Math.max(scaleForW, scaleForH) + 0.15;      // 留一点取景余量
+    // contain-fit: min(scale满足宽, scale满足高) → 图片整体显示，不裁切
+    l.scale = Math.min(2.5, (designH * ir) / (designW * 0.4));
     delete l._autoFitNeeded;
   });
 }
@@ -1684,7 +1682,29 @@ function copyCopy() {
 }
 function fallbackCopy(txt) { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); toast('文案已复制'); } catch (e) { toast('复制失败，请手动复制'); } ta.remove(); }
 
-// 批量导出已参与图片的成品图 PNG（单图成品模式下逐帧导出，其他模式导出当前拼图）
+// 为指定 frameId 单独渲染一张成品图（contain-fit，带当前背景/边框/文字层，不含其他图片层）
+function renderSingleFrame(frameId, scale) {
+  const img = imgCache[frameId];
+  if (!img || !img.naturalWidth) return null;
+  const ir = img.naturalWidth / img.naturalHeight;
+  const imgScale = Math.min(2.5, (designH * ir) / (designW * 0.4));
+  const imgLayer = { id: '_tmp_' + frameId, kind: 'image', frameId, xPct: 0.5, yPct: 0.5, scale: imgScale, rotate: 0, innerScale: 1, innerOffX: 0, innerOffY: 0 };
+  const origStyle = C.settings.pinstyle;
+  const origLayers = C.layers;
+  C.settings.pinstyle = 'single';
+  C.layers = [...(origLayers || []).filter(l => l.kind !== 'image'), imgLayer];
+  const W = Math.round(designW * scale), H = Math.round(designH * scale);
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const cc = cv.getContext('2d');
+  cc.imageSmoothingEnabled = true; cc.imageSmoothingQuality = 'high';
+  cc.scale(scale, scale);
+  drawDesign(cc);
+  C.settings.pinstyle = origStyle;
+  C.layers = origLayers;
+  return cv;
+}
+
+// 批量导出已参与图片的单图成品 PNG（每张参与图各自独立导出）
 function batchExportFinalsPng() {
   commitInline();
   const parts = participants();
@@ -1693,23 +1713,18 @@ function batchExportFinalsPng() {
   const fmt = C.settings.exp.format;
   const mime = fmt === 'jpg' ? 'image/jpeg' : 'image/png';
   const ext = fmt === 'jpg' ? 'jpg' : 'png';
-  if (C.settings.pinstyle === 'single') {
-    const origLayers = C.layers.slice();
-    parts.forEach((s, i) => {
-      C.layers = origLayers.filter(l => l.kind !== 'image' || l.frameId === s.id);
-      const cv = renderFull(scale);
-      downloadData(cv.toDataURL(mime, C.settings.exp.quality / 100), `final-${String(i + 1).padStart(3, '0')}.${ext}`);
-    });
-    C.layers = origLayers;
-    redraw();
-    toast(`已导出 ${parts.length} 张成品图`);
-  } else {
-    downloadData(renderFull(scale).toDataURL(mime, C.settings.exp.quality / 100), `final-001.${ext}`);
-    toast('已导出拼图成品');
-  }
+  let exported = 0;
+  parts.forEach((s, i) => {
+    const cv = renderSingleFrame(s.id, scale);
+    if (!cv) return;
+    downloadData(cv.toDataURL(mime, C.settings.exp.quality / 100), `final-${String(i + 1).padStart(3, '0')}.${ext}`);
+    exported++;
+  });
+  redraw();
+  toast(`已导出 ${exported} 张单图成品`);
 }
 
-// 批量打包 ZIP 已参与图片成品图
+// 批量打包 ZIP 已参与图片的单图成品
 function batchExportFinalsZip() {
   commitInline();
   const parts = participants();
@@ -1719,26 +1734,20 @@ function batchExportFinalsZip() {
   const mime = fmt === 'jpg' ? 'image/jpeg' : 'image/png';
   const ext = fmt === 'jpg' ? 'jpg' : 'png';
   const files = [];
-  if (C.settings.pinstyle === 'single') {
-    const origLayers = C.layers.slice();
-    parts.forEach((s, i) => {
-      C.layers = origLayers.filter(l => l.kind !== 'image' || l.frameId === s.id);
-      const data = renderFull(scale).toDataURL(mime, C.settings.exp.quality / 100);
-      files.push({ name: `final-${String(i + 1).padStart(3, '0')}.${ext}`, data: dataUrlToBytes(data) });
-    });
-    C.layers = origLayers;
-    redraw();
-  } else {
-    const data = renderFull(scale).toDataURL(mime, C.settings.exp.quality / 100);
-    files.push({ name: `final-001.${ext}`, data: dataUrlToBytes(data) });
-  }
+  parts.forEach((s, i) => {
+    const cv = renderSingleFrame(s.id, scale);
+    if (!cv) return;
+    const data = cv.toDataURL(mime, C.settings.exp.quality / 100);
+    files.push({ name: `final-${String(i + 1).padStart(3, '0')}.${ext}`, data: dataUrlToBytes(data) });
+  });
+  redraw();
   if (!files.length) { toast('没有可导出的内容'); return; }
   const zip = makeZip(files);
   const blob = new Blob([zip], { type: 'application/zip' });
   const url = URL.createObjectURL(blob);
-  downloadData(url, `成品图_${Date.now()}.zip`);
+  downloadData(url, `单图成品_${Date.now()}.zip`);
   setTimeout(() => URL.revokeObjectURL(url), 4000);
-  toast(`已打包 ${files.length} 张成品图`);
+  toast(`已打包 ${files.length} 张单图成品`);
 }
 
 function exportZip() {
